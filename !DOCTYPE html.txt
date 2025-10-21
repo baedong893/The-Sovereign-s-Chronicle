@@ -177,11 +177,11 @@
             /* Removed positioning properties like bottom, left, margin-left */
         }
         /* Toggle Switch CSS */
-        #image-api-toggle:checked ~ .dot {
+        .toggle-switch:checked ~ .dot {
             transform: translateX(100%);
             background-color: #f3b418;
         }
-        #image-api-toggle:checked ~ .block {
+        .toggle-switch:checked ~ .block {
             background-color: #374151;
         }
         .collapsible-content {
@@ -207,18 +207,20 @@
     <!-- Modals -->
     <div id="api-settings-modal" class="overlay hidden justify-center items-center">
         <div class="modal-content">
-            <h3 class="text-xl font-bold mb-4 text-yellow-300">API 설정</h3>
+            <h3 class="text-xl font-bold mb-4 text-yellow-300">설정</h3>
             
-            <label for="modal-api-key-input" class="block mb-2 text-sm font-medium text-gray-300">Gemini API 키 (선택 사항)</label>
-            <input type="password" id="modal-api-key-input" placeholder="여기에 API 키를 붙여넣으세요" class="modal-input">
-            <p class="text-xs text-gray-400 mt-2 mb-4">
-                API 키는 <a href="https://aistudio.google.com/api-keys" target="_blank" class="text-blue-400 hover:underline">Google AI Studio</a>에서 발급받을 수 있습니다.
-            </p>
+            <div class="bg-gray-800 p-3 rounded-md mb-4">
+                <label for="modal-api-key-input" class="block mb-2 text-sm font-medium text-gray-300">Gemini API 키 (선택 사항)</label>
+                <input type="password" id="modal-api-key-input" placeholder="여기에 API 키를 붙여넣으세요" class="modal-input">
+                <p class="text-xs text-gray-400 mt-2">
+                    API 키는 <a href="https://aistudio.google.com/api-keys" target="_blank" class="text-blue-400 hover:underline">Google AI Studio</a>에서 발급받을 수 있습니다.
+                </p>
+            </div>
     
-            <div class="bg-gray-800 p-3 rounded-md mb-6">
+            <div class="bg-gray-800 p-3 rounded-md mb-4">
                 <label class="flex items-center cursor-pointer">
                     <div class="relative">
-                        <input type="checkbox" id="image-api-toggle" class="sr-only">
+                        <input type="checkbox" id="image-api-toggle" class="sr-only toggle-switch">
                         <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
                         <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
                     </div>
@@ -228,6 +230,22 @@
                 </label>
                 <p class="mt-2 text-xs text-gray-400">
                     API 키에 이미지 생성 기능이 활성화되어 있지 않으면 작동하지 않습니다. 이 옵션을 켜면 입력한 API 키로 이미지를 생성하며, 끄면 API 키는 대화 기능에만 사용됩니다.
+                </p>
+            </div>
+
+            <div class="bg-gray-800 p-3 rounded-md mb-6">
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="fatigue-system-toggle" class="sr-only toggle-switch">
+                        <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                    </div>
+                    <div class="ml-3 text-gray-300 font-medium">
+                        피로도 및 근무 시간 시스템 활성화
+                    </div>
+                </label>
+                <p class="mt-2 text-xs text-gray-400">
+                    지도자의 건강 상태와 시간 제약을 게임에 도입하여 현실감을 높입니다.
                 </p>
             </div>
             
@@ -298,6 +316,18 @@
             <div class="mt-6 flex justify-end gap-4">
                 <button id="input-modal-cancel" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">취소</button>
                 <button id="input-modal-submit" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-md font-bold">확인</button>
+            </div>
+        </div>
+    </div>
+
+     <div id="action-confirm-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4 text-yellow-300">비근무 시간입니다</h3>
+            <p class="text-gray-400 mb-6">현재는 업무 시간이 아닙니다. 어떻게 하시겠습니까?</p>
+            <div class="space-y-3">
+                 <button id="action-confirm-emergency" class="w-full px-4 py-3 bg-red-800 hover:bg-red-700 rounded-md font-bold">비상 근무 선포 (피로도 급증)</button>
+                 <button id="action-confirm-rest" class="w-full px-4 py-3 bg-blue-700 hover:bg-blue-600 rounded-md font-bold">다음 날 아침까지 휴식</button>
+                 <button id="action-confirm-cancel" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md mt-4">취소</button>
             </div>
         </div>
     </div>
@@ -411,6 +441,7 @@
 // --- GLOBAL API KEY & SETTINGS ---
 let userApiKey = "";
 let useCustomImageApi = false;
+let useFatigueSystem = false;
 
 // --- GAME DATA & CONFIG ---
 const TECH_LEVEL_NAMES = [
@@ -464,6 +495,22 @@ const HISTORICAL_KEYWORDS = {
 
 // --- UTILITY FUNCTIONS ---
 
+function updateFatigue(hoursPassed, isResting = false, isEmergency = false) {
+    if (!useFatigueSystem) return;
+    let fatigue = game.state.playerNation.fatigue;
+    if (isResting) {
+        fatigue -= hoursPassed * 4; // Recover 4 fatigue per hour of rest
+    } else {
+        let rate = 1; // 1 fatigue per hour
+        if (isEmergency) { rate = 3; }
+        const now = new Date(game.state.world.date);
+        const currentHour = now.getHours();
+        if (currentHour < 7 || currentHour > 22) { rate *= 2; } // Double fatigue gain during deep night
+        fatigue += hoursPassed * rate;
+    }
+    game.state.playerNation.fatigue = Math.max(0, Math.min(100, fatigue));
+}
+
 function advanceTimeAndAnimate(duration, onComplete) {
     if (!game.state || !game.state.world) {
         if(onComplete) onComplete();
@@ -483,6 +530,10 @@ function advanceTimeAndAnimate(duration, onComplete) {
 
     if (!dateEl || !timeEl) {
         game.state.world.date = endDate.toISOString();
+        if (useFatigueSystem) {
+             const hoursPassed = (endDate - startDate) / (1000 * 60 * 60);
+             updateFatigue(hoursPassed, duration.isResting, game.state.world.isEmergency);
+        }
         if (onComplete) onComplete();
         return;
     }
@@ -521,6 +572,10 @@ function advanceTimeAndAnimate(duration, onComplete) {
             clearInterval(timer);
             game.state = originalState;
             game.state.world.date = endDate.toISOString();
+             if (useFatigueSystem) {
+                const hoursPassed = (endDate - startDate) / (1000 * 60 * 60);
+                updateFatigue(hoursPassed, duration.isResting, game.state.world.isEmergency);
+            }
             game.state.playerNation.treasury += totalChanges.treasury;
             game.state.playerNation.manpower += totalChanges.manpower;
             game.state.playerNation.resources += totalChanges.resources;
@@ -561,10 +616,10 @@ function estimateTimeForAction(text) {
     const lowerText = text.toLowerCase();
     
     if (lowerText.includes('전쟁') || lowerText.includes('원정') || lowerText.includes('건설') || lowerText.includes('이동')) {
-        return { days: Math.floor(Math.random() * 10) + 1 };
+        return { hours: Math.floor(Math.random() * 4) + 2 };
     }
     if (lowerText.includes('회의') || lowerText.includes('토론') || lowerText.includes('논의') || lowerText.includes('만찬')) {
-        return { hours: Math.floor(Math.random() * 4) + 2 };
+        return { hours: Math.floor(Math.random() * 2) + 1 };
     }
     if (lowerText.length > 50) {
         return { minutes: Math.floor(Math.random() * 45) + 15 };
@@ -651,25 +706,6 @@ function pcmToWav(pcmData, sampleRate) {
         view.setInt16(44 + i * 2, pcmData[i], true);
     }
     return new Blob([view], { type: 'audio/wav' });
-}
-
-function calculatePolicyCost(effects) {
-    if (!effects) return 50;
-    const weights = {
-        stability: 10, approval: 8, politicalPower: 12, treasury: 0.5,
-        manpower: 0.0001, resources: 2, techLevel: 50, loyalty: 5
-    };
-    let calculatedCost = 0;
-    for (const [key, value] of Object.entries(effects)) {
-        let effectType = key.split('_')[0];
-        if (key.includes('loyalty')) effectType = 'loyalty';
-        const weight = weights[effectType] || 1;
-        calculatedCost += value * weight;
-    }
-    let finalCost = 50 + calculatedCost;
-    finalCost = Math.max(25, finalCost);
-    finalCost = Math.ceil(finalCost / 5) * 5;
-    return finalCost;
 }
 
 function getCurrencySymbol(dateString, nationName = '') {
@@ -982,6 +1018,9 @@ const game = {
         this.state.absurdityCounter = 0;
         this.state.playerNation.powerInfluence = this.state.playerNation.powerInfluence || 75;
         this.state.playerNation.income = this.state.playerNation.income || { treasury: 10, manpower: 5, resources: 1 };
+        this.state.playerNation.fatigue = 0;
+        this.state.world.isEmergency = false;
+
 
 
         // Reset dynamic data
@@ -1014,6 +1053,17 @@ const game = {
      */
     async update(playerChoice) {
         if (playerChoice) {
+             if (useFatigueSystem) {
+                const now = new Date(this.state.world.date);
+                const currentHour = now.getHours();
+                const isWorkingHours = currentHour >= 9 && currentHour < 19;
+
+                if (!isWorkingHours && !this.state.world.isEmergency) {
+                    openActionConfirmModal(playerChoice);
+                    return; // Stop further processing until user decides
+                }
+            }
+            // If fatigue system is off, or it's working hours, or it's an emergency, proceed.
             const timeToAdvance = estimateTimeForAction(playerChoice.text);
             advanceTimeAndAnimate(timeToAdvance, async () => {
                 await this.processTurn(playerChoice);
@@ -1109,34 +1159,44 @@ const game = {
      * @param {object} playerChoice - The choice object selected by the player.
      */
     async handleStandardChoice(currentState, playerChoice) {
-        const systemPrompt = "You are a master storyteller and game master for 'The Sovereign's Chronicle'. Generate the next event IN KOREAN based on the player's choice. Follow these rules strictly:\n" +
-            "1.  **Use Correct Honorifics:** Address the leader with their historically accurate title.\n" +
-            "2.  **Naming Convention:** For foreign names/places, use the format 'Original (Korean Phonetic)' e.g., 'Berlin (베를린)'.\n" +
-            "3.  **Reflect Game State:** The narrative MUST reflect the current state of internal factions (especially their loyalty), national spirits, and enacted policies. For example, if the 'Aristocracy' faction has low loyalty, the narrative might mention grumbling nobles.\n" +
-            "4.  **Response Format:** Respond with ONLY the following sections, separated by '---':\n" +
-            "    NARRATIVE: [A compelling story of what happens next.]\n" +
-            "    ---\n" +
-            "    PROMPT: [A new question for the player.]\n" +
-            "    ---\n" +
-            "    CHOICE 1: [Text for the first new choice.]\n" +
-            "    ---\n" +
-            "    CHOICE 2: [Text for the second new choice.]\n" +
-            "    ---\n" +
-            "    CHOICE 3: [Text for a third new choice (optional).]\n" +
-            "    ---\n" +
-            "    EFFECTS: [A valid JSON array of game state changes. Examples: {\"type\": \"INTERNAL_FACTION_LOYALTY\", \"factionId\": \"nobility\", \"change\": -5, \"reason\": \"New tax policy\"}, {\"type\": \"RESOURCE\", \"resource\": \"treasury\", \"change\": 100, \"reason\": \"War spoils\"}]";
+        const systemPrompt = `You are a game master for 'The Sovereign's Chronicle'. Your role is to create a challenging and realistic experience based on these core mechanics:
+1.  **Treasury (국고) is Fuel:** Almost all significant actions (military, research, diplomacy) cost \`treasury\`. Choices must often reflect a cost.
+2.  **The Core Dilemma:** Players face a constant choice between investing in the future (like research, which improves \`techLevel\`) and securing the present (like military, which affects battle outcomes).
+3.  **Time is a Constraint:** Actions take time, meaning a choice for one path delays the other.
+4.  **Stability (안정도) is Feedback:** The player's success or failure is reflected in \`stability\`. Military victories, successful research, and popular policies increase it. Defeats, internal strife, and resource shortages decrease it. Low stability can lead to negative events like rebellions.
+5.  **(If active) Fatigue System:** The leader's fatigue impacts their effectiveness. High fatigue might lead to poor outcomes or dialogue reflecting their exhaustion.
 
+Generate the next event IN KOREAN based on the player's choice. Follow these rules strictly:
+-   **Reflect Game State:** The narrative MUST reflect the current state (factions, stability, leader's fatigue, etc.).
+-   **Create Dilemmas:** Create choices that present a clear dilemma (e.g., spend money now on troops vs. save for a long-term project).
+-   **Strict Response Format:** Respond with ONLY the following sections, separated by '---':
+    NARRATIVE: [A compelling story of what happens next.]
+    ---
+    PROMPT: [A new question for the player.]
+    ---
+    CHOICE 1: [Text for the first new choice.]
+    ---
+    CHOICE 2: [Text for the second new choice.]
+    ---
+    CHOICE 3: [Text for a third new choice (optional).]
+    ---
+    EFFECTS: [A valid JSON array of game state changes. For effects of type "NEW_LEADER_TRAIT", the trait's 'effects' object MUST ONLY use keys from this list: [stability, approval, politicalPower, treasury, manpower, resources, techLevel, powerInfluence]. Examples: {"type": "INTERNAL_FACTION_LOYALTY", "factionId": "nobility", "change": -5}, {"type": "RESOURCE", "resource": "treasury", "change": -500}, {"type": "NEW_LEADER_TRAIT", "trait": {"id": "frugal", "name": "검소함", "description": "...", "effects": {"treasury_bonus": 5}}}]`;
+        
         const factionInfo = (currentState.factions || []).map(f => `${f.name}(${f.status}, 관계 ${f.relationship})`).join(', ');
         const internalFactionInfo = (currentState.internalFactions || []).map(f => `${f.name}(충성도 ${f.loyalty})`).join(', ');
-        const policiesInfo = (currentState.policies || []).filter(p => p.enacted).map(p => p.name).join(', ') || '없음';
+        
+        let fatigueContext = '';
+        if (useFatigueSystem && currentState.playerNation.fatigue > 50) {
+            fatigueContext = `- Leader's Fatigue: ${currentState.playerNation.fatigue.toFixed(0)}% (High - This should affect the narrative, showing signs of exhaustion or poor judgment).\n`;
+        }
 
         const userPrompt = `CURRENT STATE for ${currentState.playerNation.name} in ${new Date(currentState.world.date).getFullYear()}:\n` +
-            `- Previous Event: "${Events[currentState.world.currentEvent].narrative}"\n` +
+            `- Stability: ${currentState.playerNation.stability}, Treasury: ${currentState.playerNation.treasury}\n`+
+            fatigueContext +
             `- Foreign Factions: ${factionInfo}\n` +
             `- Internal Factions: ${internalFactionInfo}\n` +
-            `- Enacted Policies: ${policiesInfo}\n` +
             `PLAYER'S CHOICE: "${playerChoice.text}"\n` +
-            'Generate the next event, narrative, choices, and a JSON array for EFFECTS.';
+            'Generate the next event, narrative, choices, and a JSON array for EFFECTS that reflects the game mechanics.';
         
         const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
         if (!responseText) {
@@ -1527,22 +1587,64 @@ const game = {
         },
 
         renderCollapsiblePanels() {
-            this.renderCollapsiblePanel('time-panel-container', '현재 시각', game.state.world, this.getTimePanelHtml);
+            this.renderCollapsiblePanel('time-panel-container', '현재 시각', game.state, this.getTimePanelHtml);
             this.renderCollapsiblePanel('national-spirits-container', '국가 정신', game.state.nationalSpirits, this.getNationalSpiritsHtml);
             this.renderCollapsiblePanel('internal-factions-container', '내부 세력', game.state.internalFactions, this.getInternalFactionsHtml);
             this.renderCollapsiblePanel('factions-container', '주변 국가', game.state.factions, this.getExternalFactionsHtml);
             this.renderCollapsiblePanel('leader-traits-container', '지도자 특성', game.state.leaderTraits, this.getLeaderTraitsHtml);
         },
         
-        getTimePanelHtml(worldState) {
-            if (!worldState || !worldState.date) return '';
-            const dateObj = new Date(worldState.date);
-            const dateString = formatHistoricalDate(worldState.date);
+        getTimePanelHtml(state) {
+            if (!state || !state.world || !state.world.date) return '';
+            const dateObj = new Date(state.world.date);
+            const dateString = formatHistoricalDate(state.world.date);
             const timeString = dateObj.toTimeString().split(' ')[0];
 
-            return `<div class="text-center font-mono text-xl tracking-wider">
-                        <span id="time-panel-date">${dateString}</span>
-                        <span id="time-panel-time" class="ml-4 text-yellow-300">${timeString}</span>
+            let fatigueHtml = '';
+            if (useFatigueSystem) {
+                const fatigue = state.playerNation.fatigue || 0;
+                let statusText, statusColor, workStatus, workStatusColor, emergencyText = '';
+
+                if (fatigue < 25) { statusText = '양호'; statusColor = 'text-green-400'; }
+                else if (fatigue < 50) { statusText = '보통 피로'; statusColor = 'text-yellow-400'; }
+                else if (fatigue < 75) { statusText = '높은 피로'; statusColor = 'text-orange-400'; }
+                else { statusText = '극심한 피로'; statusColor = 'text-red-500'; }
+
+                const currentHour = dateObj.getHours();
+                if (state.world.isEmergency) {
+                    workStatus = '비상사태'; workStatusColor = 'bg-red-600';
+                    emergencyText = `<p class="text-xs text-red-400 mt-1 animate-pulse">밤샘 근무로 건강이 악화되고 있습니다.</p>`;
+                } else if (currentHour >= 9 && currentHour < 19) {
+                    workStatus = '근무중'; workStatusColor = 'bg-green-600';
+                } else {
+                    workStatus = '비근무시간'; workStatusColor = 'bg-gray-500';
+                }
+
+                const gradientColor = `linear-gradient(to right, #4ade80, #facc15, #f97316, #ef4444)`;
+
+                fatigueHtml = `
+                    <div class="mt-4 pt-4 border-t border-gray-700 text-sm">
+                        <div class="flex justify-between items-center mb-2">
+                             <div>
+                                <span class="font-bold">건강 상태: <span class="${statusColor}">${statusText}</span></span>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold text-white ${workStatusColor} rounded-full">${workStatus}</span>
+                            </div>
+                            <span class="font-mono text-gray-300">${fatigue.toFixed(0)}%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5">
+                            <div class="h-2.5 rounded-full" style="width: ${fatigue}%; background: ${gradientColor}; transition: width 0.5s ease-in-out;"></div>
+                        </div>
+                        ${emergencyText}
+                    </div>
+                `;
+            }
+
+            return `<div class="font-mono">
+                        <div class="text-center text-xl tracking-wider">
+                            <span id="time-panel-date">${dateString}</span>
+                            <span id="time-panel-time" class="ml-4 text-yellow-300">${timeString}</span>
+                        </div>
+                        ${fatigueHtml}
                     </div>`;
         },
 
@@ -1735,6 +1837,7 @@ function showInfoModal(title, message) { openReportModal(title, message); }
 function openApiSettingsModal() {
     document.getElementById('modal-api-key-input').value = localStorage.getItem('geminiApiKey') || '';
     document.getElementById('image-api-toggle').checked = localStorage.getItem('useCustomImageApi') === 'true';
+    document.getElementById('fatigue-system-toggle').checked = useFatigueSystem;
     document.getElementById('api-settings-modal').classList.remove('hidden');
 }
 function closeApiSettingsModal() { document.getElementById('api-settings-modal').classList.add('hidden'); }
@@ -1744,8 +1847,14 @@ function saveApiSettings() {
     localStorage.setItem('geminiApiKey', userApiKey);
     useCustomImageApi = document.getElementById('image-api-toggle').checked;
     localStorage.setItem('useCustomImageApi', useCustomImageApi.toString());
-    showInfoModal('설정 저장', '설정이 저장되었습니다.');
+    useFatigueSystem = document.getElementById('fatigue-system-toggle').checked;
+    localStorage.setItem('useFatigueSystem', useFatigueSystem.toString());
+
+    showInfoModal('설정 저장', '설정이 저장되었습니다. 일부 설정은 게임을 다시 시작해야 적용될 수 있습니다.');
     closeApiSettingsModal();
+    if (game.state && game.state.world) {
+        game.Renderer.renderAll(); // Re-render to show/hide fatigue panel
+    }
 }
 let onInputModalSubmit = null;
 function openInputModal(title, promptText, callback) {
@@ -1764,17 +1873,16 @@ function submitInputModal() {
     closeInputModal();
 }
 
-async function isActionAbsurd(userInput, state) {
-    const systemPrompt = "You are a historical anachronism detector. Your only job is to determine if a command is impossible because it contains technology or concepts from the distant future. For example, 'Build a smartphone factory' in 1592 is anachronistic. 'Appoint my horse as a consul' is strange, but not anachronistic. Respond with only one word: `PLAUSIBLE` if the action is historically possible (even if bizarre), or `ABSURD` if it is a clear anachronism from the future.";
-    const userPrompt = `Context: The year is ${formatHistoricalDate(state.world.date)} for the nation of ${state.playerNation.name}. Command: "${userInput}"`;
-    
-    try {
-        const response = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
-        return response.trim().toUpperCase() === 'ABSURD';
-    } catch (e) {
-        console.error("Absurdity check failed:", e);
-        return false; // Fail safe to plausible
-    }
+let pendingChoice = null;
+
+function openActionConfirmModal(choice) {
+    pendingChoice = choice;
+    document.getElementById('action-confirm-modal').classList.remove('hidden');
+}
+
+function closeActionConfirmModal() {
+    pendingChoice = null;
+    document.getElementById('action-confirm-modal').classList.add('hidden');
 }
 
 async function handleAbsurdAction() {
@@ -1906,7 +2014,8 @@ async function generateCustomScenario(promptOverride = null) {
 2.  **Historical Plausibility:** Provide realistic starting values for all game parameters. **Crucially, the 'techLevel' MUST be appropriate for the requested era.** (e.g., year 1868 should be around level 4-5, not 1).
 3.  **JSON Format:** ALL JSON data MUST be valid.
 4.  **Provide Modifiers:** You MUST include at least one or two starting modifiers in the 'MODIFIERS' JSON array to reflect unique historical circumstances.
-5.  **Strict Response Format:** Use '---' as a separator. The 'FACTIONS' JSON must have 'relationship' and 'reason'. 'INTERNAL_FACTIONS' must have 'desire'. 'LEADER_TRAITS' must be an array of objects.
+5.  **Strict Response Format:** Use '---' as a separator. The 'FACTIONS' JSON must have 'relationship' and 'reason'. 'INTERNAL_FACTIONS' must have 'desire'.
+6.  **Valid Trait Effects:** For the 'effects' object within 'LEADER_TRAITS', you MUST ONLY use keys from this list: [stability, approval, politicalPower, treasury, manpower, resources, techLevel, powerInfluence]. You can add '_bonus' or '_penalty' to them if appropriate, but do not invent new keys.
 
 **RESPONSE FORMAT:**
 SCENARIO_NAME: [Plausible Nation Name]
@@ -2097,7 +2206,15 @@ async function getGroupAdvice(isFollowUp = false, userInput = "") {
     const currentEvent = Events[game.state.world.currentEvent];
     const advisorList = selectedAdvisors.map(a => `- ${a.name} (${a.title}, ${a.personality})`).join('\n');
     const systemPrompt = `You are an AI moderator for a council of historical advisors. Your task is to simulate a dynamic, realistic, and sometimes contentious discussion. **Core Rules:** 1. **Generate Conflict:** If advisors with opposing personalities are present, they MUST argue. 2. **Actionable Proposals:** If an advisor makes a clear suggestion, prefix it with "PROPOSAL:". 3. **Conversational Flow:** Keep responses brief and back-and-forth. 4. **In-Character:** All dialogue must reflect the advisor's personality. 5. **Language:** Respond in Korean. Each line must start with the speaker's name in bold.`;
+    
     let userPrompt = `Current Situation: "${currentEvent.narrative}"\n`;
+
+    if (useFatigueSystem && game.state.playerNation.fatigue > 50) {
+        const fatigue = game.state.playerNation.fatigue.toFixed(0);
+        let fatigueDesc = fatigue > 75 ? "극심하게 지쳐 판단력이 흐려진 상태" : "매우 피로한 상태";
+        userPrompt += `LEADER'S STATE: 현재 지도자는 ${fatigueDesc}입니다 (피로도 ${fatigue}%). 대화에 이 점을 반영하십시오. (예: 조언자들이 걱정, 지도자의 말이 어눌해짐)\n\n`;
+    }
+
     if (game.state.nationalSpirits.length > 0) {
         const spiritNames = game.state.nationalSpirits.map(id => NATIONAL_SPIRITS[id].name).join(', ');
         userPrompt += `Our nation's Spirits: [${spiritNames}]. This should influence opinions.\n\n`;
@@ -2276,6 +2393,39 @@ window.onload = () => {
     document.getElementById('input-modal-textarea').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInputModal(); }
     });
+    
+    document.getElementById('action-confirm-cancel').onclick = closeActionConfirmModal;
+    document.getElementById('action-confirm-emergency').onclick = () => {
+        if (pendingChoice) {
+            game.state.world.isEmergency = true;
+            const timeToAdvance = estimateTimeForAction(pendingChoice.text);
+            advanceTimeAndAnimate(timeToAdvance, async () => {
+                await game.processTurn(pendingChoice);
+                game.state.world.isEmergency = false; // Reset after action
+            });
+        }
+        closeActionConfirmModal();
+    };
+    document.getElementById('action-confirm-rest').onclick = () => {
+        const now = new Date(game.state.world.date);
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        const restDuration = (tomorrow - now) / 1000; // in seconds
+        
+        advanceTimeAndAnimate({ seconds: restDuration, isResting: true }, () => {
+             if (pendingChoice) {
+                const timeToAdvance = estimateTimeForAction(pendingChoice.text);
+                 advanceTimeAndAnimate(timeToAdvance, async () => {
+                    await game.processTurn(pendingChoice);
+                });
+             } else {
+                game.Renderer.renderAll();
+             }
+        });
+        closeActionConfirmModal();
+    };
+
     document.getElementById('game-content').addEventListener('click', function(e) {
         const header = e.target.closest('.collapsible-header');
         if (header) { toggleCollapsible(header); }
@@ -2311,9 +2461,11 @@ window.onload = () => {
     document.addEventListener('scroll', () => {
         if (activeTooltip) { activeTooltip.style.visibility = 'hidden'; activeTooltip.style.opacity = '0'; activeTooltip = null; }
     }, true);
+    
     const savedApiKey = localStorage.getItem('geminiApiKey');
     if (savedApiKey) { userApiKey = savedApiKey; }
     useCustomImageApi = localStorage.getItem('useCustomImageApi') === 'true';
+    useFatigueSystem = localStorage.getItem('useFatigueSystem') === 'true';
 };
 </script>
 </body>
