@@ -390,6 +390,8 @@
                 </div>
 
                 <div id="time-panel-container" class="my-6"></div>
+
+                <div id="research-panel-container" class="my-6"></div>
                 
                 <div id="national-spirits-container" class="my-6">
                             <!-- National Spirits will be rendered here -->
@@ -1588,12 +1590,35 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
 
         renderCollapsiblePanels() {
             this.renderCollapsiblePanel('time-panel-container', '현재 시각', game.state, this.getTimePanelHtml);
+            this.renderCollapsiblePanel('research-panel-container', '연구', game.state.research, this.getResearchPanelHtml);
             this.renderCollapsiblePanel('national-spirits-container', '국가 정신', game.state.nationalSpirits, this.getNationalSpiritsHtml);
             this.renderCollapsiblePanel('internal-factions-container', '내부 세력', game.state.internalFactions, this.getInternalFactionsHtml);
             this.renderCollapsiblePanel('factions-container', '주변 국가', game.state.factions, this.getExternalFactionsHtml);
             this.renderCollapsiblePanel('leader-traits-container', '지도자 특성', game.state.leaderTraits, this.getLeaderTraitsHtml);
         },
         
+        getResearchPanelHtml(researchState) {
+            if (!researchState || !researchState.currentProject) return '';
+
+            const progress = researchState.progress || 0;
+            const projectName = researchState.currentProject.name;
+            const gradientColor = `linear-gradient(to right, #60a5fa, #3b82f6, #1d4ed8)`;
+
+            return `
+                 <div class="font-mono text-sm">
+                    <div class="flex justify-between items-center mb-2">
+                         <div>
+                            <span class="font-bold">연구: <span class="text-blue-300">${projectName}</span></span>
+                            <span class="ml-4 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">진행중</span>
+                        </div>
+                        <span class="font-mono text-gray-300">${progress.toFixed(0)}%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-blue-500 h-2.5 rounded-full" style="width: ${progress}%; background: ${gradientColor}; transition: width 0.5s ease-in-out;"></div>
+                    </div>
+                </div>`;
+        },
+
         getTimePanelHtml(state) {
             if (!state || !state.world || !state.world.date) return '';
             const dateObj = new Date(state.world.date);
@@ -1651,12 +1676,13 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
         renderCollapsiblePanel(containerId, title, data, renderer) {
             const container = document.getElementById(containerId);
             if (!data || (Array.isArray(data) && data.length === 0)) {
-                if(containerId !== 'time-panel-container') {
+                if(containerId !== 'time-panel-container' && containerId !== 'research-panel-container') {
                      container.innerHTML = ''; return;
                 }
             }
              const icons = {
                  '현재 시각': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>`,
+                 '연구': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.901 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.16a.873.873 0 0 1-1.255-.52l-.094-.319z"/></svg>`,
                  '국가 정신': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464A.5.5 0 0 1 14.5 9v7a.5.5 0 0 1-.722.454L13 16.01l-.278.454A.5.5 0 0 1 12.5 16h-11a.5.5 0 0 1-.454-.722L1 15.01l-.454-.278A.5.5 0 0 1 0 14.5v-13a.5.5 0 0 1 .278-.454L1 .01l.222-.454A.5.5 0 0 1 1.5 0h13.278zM1.5 14.722L1 14.5V1.5L1.5 1.28l.222.454L2.5 2h11v12h-11l.722.454-.222.454zM2 2.5a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-11z"/></svg>`,
                  '내부 세력': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>`,
                  '주변 국가': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM1.06 8.5h2.04c.143 1.298.535 2.503 1.074 3.5H2.21a6.97 6.97 0 0 1-.942-3.483zM3.63 4.5H2.21A6.97 6.97 0 0 1 3.153 1H4.7a10.87 10.87 0 0 0-.923 3.5zM4.144 8.5H1.06c.07-.639.187-1.265.34-1.856h2.478c-.068.599-.115 1.212-.134 1.856zm3.856 4.58c.458.33.98.594 1.542.793v-1.99a12.18 12.18 0 0 1-1.542-1.383zM8 1c.562.199 1.084.463 1.542.793v1.99a12.18 12.18 0 0 1-1.542 1.383zM11.856 12a12.17 12.17 0 0 1 1.542 1.383v1.99c.562-.199 1.084-.463 1.542-.793zm1.93-3.5h-2.04c-.019-.644-.066-1.257-.134-1.856h2.478c.153.59.27 1.217.34 1.856zM12.37 4.5h1.42a6.97 6.97 0 0 1 .943 3.5h-2.04c-.143-1.298-.535-2.503-1.074-3.5zm-1.144 7h2.28a7.03 7.03 0 0 1-1.074 3.5h-1.37a12.23 12.23 0 0 0 .164-3.5zm-7-7h2.28A7.03 7.03 0 0 1 5.43 1H4.06a12.23 12.23 0 0 0 .164 3.5z"/></svg>`,
@@ -2107,7 +2133,8 @@ ADVISOR_SATISFACTION: [Name, Title, Personality, Description]`;
                     modifiers: modifiers 
                 },
                 world: { date: isoDate, currentEvent: 'custom_event_start' },
-                advisors, factions, internalFactions, leaderTraits, policies: []
+                advisors, factions, internalFactions, leaderTraits, policies: [],
+                research: { currentProject: null, progress: 0, timeElapsed: 0 }
             },
             initialEvent: { id: 'custom_event_start', narrative: briefingContent, prompt: "이 중대한 순간에, 어떤 첫걸음을 내딛으시겠습니까?", choices: [ { id: `custom_1`, text: "상황을 안정시키고 내부를 다진다.", description: "혼란을 수습하고 국력을 비축합니다." }, { id: `custom_2`, text: "과감하게 행동하여 기회를 잡는다.", description: "위기를 기회로 삼아 공세적으로 나섭니다." }, { id: `custom_3`, text: "주변 세력과 외교적 해법을 모색한다.", description: "전쟁보다는 대화를 통해 문제를 해결합니다." } ] }
         };
