@@ -1,0 +1,2321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Sovereign's Chronicle(데모3)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #111827; /* Dark blue-gray */
+            color: #e0e0e0;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        .font-mono {
+            font-family: 'Source Code Pro', monospace;
+        }
+        #container {
+            max-width: 900px;
+            margin: auto;
+            background-color: #1f2937; /* Tailwind gray-800 */
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border-color: #374151; /* Tailwind gray-700 */
+        }
+        .choice-button {
+            transition: all 0.2s ease-in-out;
+            border-width: 1px;
+            border-color: #4b5563; /* gray-600 */
+            background-color: #374151; /* gray-700 */
+        }
+        .choice-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2); /* Yellow glow */
+            background-color: #4b5563; /* gray-600 */
+            border-color: #fbbf24; /* amber-300 */
+        }
+        .header-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .header-button:hover {
+            background-color: #f3b418;
+            color: #1a1a1a;
+        }
+        .ui-panel-item {
+            border-left: 3px solid #f3b418; /* Changed to theme yellow */
+        }
+        .narrative-quote {
+            border-left: 4px solid #a3a3a3;
+            background-color: rgba(0,0,0,0.1);
+        }
+        .combat-log {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2a2a2a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+        /* Gemini Loading & Modal Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            display: flex;
+            
+            color: white;
+            flex-direction: column;
+            gap: 1rem;
+            font-size: 1.2rem;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #f3b418;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-content {
+            background-color: #2a2a2a;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 500px;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+        }
+        .speaker-button {
+            cursor: pointer;
+            transition: color 0.2s;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        .speaker-button:hover {
+            color: #f3b418;
+        }
+        #advisor-modal-content {
+            background-color: #2a2a2a;
+            border: 2px solid #555;
+            box-shadow: 0 0 15px rgba(0,0,0,0.7);
+            color: #e0e0e0;
+            width: 95%;
+            max-width: 800px;
+        }
+        .advisor-portrait-cell {
+            border: 2px solid #444;
+            background-color: rgba(0,0,0,0.2);
+            padding: 4px;
+        }
+        .advisor-portrait {
+            height: 128px;
+            width: 128px;
+            cursor: pointer;
+            border: 4px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .advisor-portrait.selected {
+            border-color: #f3b418;
+        }
+        .dialogue-entry {
+            margin-bottom: 8px;
+        }
+        .ui-tooltip {
+            position: relative;
+            cursor: help;
+        }
+        .ui-tooltip .tooltip-text {
+            visibility: hidden;
+            width: 250px;
+            background-color: #1a1a1a;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: fixed; /* Changed from absolute to fixed */
+            z-index: 10000; /* Increased z-index for safety */
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid #555;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            /* Removed positioning properties like bottom, left, margin-left */
+        }
+        /* Toggle Switch CSS */
+        #image-api-toggle:checked ~ .dot {
+            transform: translateX(100%);
+            background-color: #f3b418;
+        }
+        #image-api-toggle:checked ~ .block {
+            background-color: #374151;
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible-header .arrow {
+            transition: transform 0.3s;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="gemini-loading-overlay" class="overlay hidden justify-center items-center">
+        <div class="spinner"></div>
+        <p>✨ Gemini가 새로운 역사를 생성하는 중...</p>
+    </div>
+
+    <!-- Modals -->
+    <div id="api-settings-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4 text-yellow-300">API 설정</h3>
+            
+            <label for="modal-api-key-input" class="block mb-2 text-sm font-medium text-gray-300">Gemini API 키 (선택 사항)</label>
+            <input type="password" id="modal-api-key-input" placeholder="여기에 API 키를 붙여넣으세요" class="modal-input">
+            <p class="text-xs text-gray-400 mt-2 mb-4">
+                API 키는 <a href="https://aistudio.google.com/api-keys" target="_blank" class="text-blue-400 hover:underline">Google AI Studio</a>에서 발급받을 수 있습니다.
+            </p>
+    
+            <div class="bg-gray-800 p-3 rounded-md mb-6">
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="image-api-toggle" class="sr-only">
+                        <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                    </div>
+                    <div class="ml-3 text-gray-300 font-medium">
+                        API 키로 이미지 생성 사용
+                    </div>
+                </label>
+                <p class="mt-2 text-xs text-gray-400">
+                    API 키에 이미지 생성 기능이 활성화되어 있지 않으면 작동하지 않습니다. 이 옵션을 켜면 입력한 API 키로 이미지를 생성하며, 끄면 API 키는 대화 기능에만 사용됩니다.
+                </p>
+            </div>
+            
+            <div class="mt-6 flex justify-end gap-4">
+                <button onclick="closeApiSettingsModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">취소</button>
+                <button onclick="saveApiSettings()" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-md font-bold">저장</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="era-choice-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4 text-yellow-300">시대 선택</h3>
+            <p class="text-gray-400 mb-4">시작하고 싶은 시대, 국가, 사건 등을 자유롭게 입력하세요.</p>
+            <textarea id="era-input" class="modal-input" rows="3" placeholder="예: 1597년 명량해전, 조선"></textarea>
+            <div class="mt-6 flex justify-end gap-4">
+                <button onclick="hideEraModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">취소</button>
+                <button onclick="generateCustomScenario()" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-md font-bold">생성</button>
+            </div>
+        </div>
+    </div>
+    <div id="image-modal" class="overlay hidden items-center justify-center p-4" style="background-color: rgba(0, 0, 0, 0.85);">
+        <button onclick="closeImageModal()" class="absolute top-4 right-6 text-white text-5xl font-bold hover:text-gray-300 transition">&times;</button>
+        <img id="modal-image" src="" alt="Enlarged event image" class="max-w-full max-h-full object-contain rounded-md shadow-lg">
+    </div>
+    
+    <div id="report-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content">
+            <h3 id="report-title" class="text-xl font-bold mb-4 text-yellow-300">특별 보고</h3>
+            <div id="report-content" class="text-gray-300 mb-6 max-h-96 overflow-y-auto"></div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button onclick="closeReportModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md text-white">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="advisor-selector-modal" class="overlay hidden justify-center items-center">
+        <div id="advisor-modal-content" class="modal-content p-4">
+            <h2 id="advisor-council-title" class="text-2xl font-bold text-center text-yellow-300 mb-4 font-mono tracking-wider">HIGH COUNCIL</h2>
+            <div id="advisor-portraits-container" class="grid grid-cols-5 gap-2 mb-4 p-2 rounded">
+                <!-- Advisor portraits and roles will be generated here -->
+            </div>
+            <p class="text-center text-sm text-gray-400 mb-4">토론에 참여시킬 조언자를 선택하십시오.</p>
+            <div class="mt-6 flex justify-end gap-4">
+                <button onclick="closeAdvisorSelector()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md text-white">취소</button>
+                <button onclick="startAdvisorDiscussion()" class="px-6 py-2 bg-blue-700 hover:bg-blue-800 text-white border-2 border-blue-500 rounded-md font-bold">의견 종합</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="intelligence-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content w-full max-w-2xl">
+             <h3 class="text-xl font-bold mb-4 text-yellow-300">첩보 본부</h3>
+             <div id="intelligence-actions-list" class="space-y-3 max-h-80 overflow-y-auto">
+                 <!-- Intelligence actions will be rendered here -->
+             </div>
+             <div class="mt-6 flex justify-end gap-4">
+                 <button onclick="closeIntelligenceModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">닫기</button>
+             </div>
+        </div>
+    </div>
+
+    <div id="input-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content">
+            <h3 id="input-modal-title" class="text-xl font-bold mb-4 text-yellow-300"></h3>
+            <p id="input-modal-prompt" class="text-gray-400 mb-4"></p>
+            <textarea id="input-modal-textarea" class="modal-input" rows="2"></textarea>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="input-modal-cancel" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">취소</button>
+                <button id="input-modal-submit" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-md font-bold">확인</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="container" class="rounded-lg overflow-hidden border">
+        <header class="bg-gray-900 p-4 border-b border-gray-700 flex justify-between items-center gap-4">
+            <div class="flex items-center">
+                <button onclick="openApiSettingsModal()" class="header-button p-2 rounded-md" title="API 설정">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="-1 -1 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+            </div>
+            <h1 class="text-xl md:text-2xl font-orbitron text-center text-yellow-300 tracking-wider flex-grow">The Sovereign's Chronicle(데모3)</h1>
+            <div id="pre-game-header-buttons" class="flex gap-2">
+                <button onclick="generateRandomScenario()" class="header-button text-sm px-3 py-1 border border-yellow-400 text-yellow-400 rounded-md">랜덤 시대</button>
+                <button onclick="showEraModal()" class="header-button text-sm px-3 py-1 border border-yellow-400 text-yellow-400 rounded-md">시대 선택</button>
+            </div>
+            <div id="in-game-header-buttons" class="hidden flex gap-2">
+                <button onclick="openIntelligenceModal()" class="header-button text-sm px-3 py-1 border border-yellow-400 text-yellow-400 rounded-md" title="첩보 본부 열기">🔍 첩보</button>
+                <button onclick="openAdvisorSelector()" class="header-button text-sm px-3 py-1 border border-yellow-400 text-yellow-400 rounded-md" title="자문회 소집">✨ 자문회</button>
+            </div>
+        </header>
+
+        <main id="game-window" class="p-4 md:p-6 min-h-screen">
+            <!-- Start Screen -->
+            <div id="start-screen">
+                <div id="briefing-paper" class="text-gray-800 p-6 md:p-8 rounded-md shadow-lg max-w-3xl mx-auto" style="background-color: #F5EEDC; background-image: url('https://www.toptal.com/designers/subtlepatterns/patterns/crumply.png');">
+                    <div id="briefing-header">
+                        <div class="border-b-2 border-gray-400 pb-2 mb-4">
+                            <h2 id="briefing-title" class="text-xl font-bold text-center text-gray-800 font-mono">SOVEREIGN'S CHRONICLE</h2>
+                            <p id="briefing-subtitle" class="text-sm text-center text-gray-600 font-mono">A DYNAMIC HISTORY SIMULATOR</p>
+                        </div>
+                    </div>
+                    <div id="briefing-content" class="space-y-4 text-lg">
+                        <div id="briefing-metadata">
+                            <!-- This will be populated by JS -->
+                        </div>
+                        <hr id="briefing-hr" class="my-4 border-gray-300 hidden">
+                        <p id="briefing-body" class="text-center italic text-gray-600 py-8">
+                            상단의 [랜덤 시대] 또는 [시대 선택] 버튼을 눌러 당신의 연대기를 시작하십시오.
+                        </p>
+                    </div>
+                    <div id="briefing-footer" class="mt-8 pt-4 border-t-2 border-gray-400 text-center">
+                        <button id="start-button" onclick="startGame(this.dataset.scenarioId)" disabled class="w-full md:w-auto px-8 py-3 bg-blue-800 text-white font-bold text-xl rounded-md choice-button border-transparent tracking-wider opacity-50 cursor-not-allowed">
+                            [ 연대기 시작 ]
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Content (hidden by default) -->
+            <div id="game-content" class="hidden">
+                <div id="event-image-container" class="relative mb-4 rounded-lg overflow-hidden h-64 bg-gray-900 flex items-center justify-center">
+                    <!-- Image or loading indicator will go here -->
+                </div>
+                <div id="narrative-output" class="mb-6 space-y-4 text-lg leading-relaxed"></div>
+                
+                <div id="ui-panel-container" class="my-6">
+                    <!-- UI Panel will be rendered here by JS -->
+                </div>
+
+                <div id="time-panel-container" class="my-6"></div>
+                
+                <div id="national-spirits-container" class="my-6">
+                            <!-- National Spirits will be rendered here -->
+                </div>
+
+                <div id="internal-factions-container" class="my-6">
+                            <!-- Internal Factions will be rendered here -->
+                </div>
+
+                <div id="factions-container" class="my-6">
+                            <!-- Factions will be rendered here -->
+                </div>
+                
+                <div id="leader-traits-container" class="my-6">
+                            <!-- Leader Traits will be rendered here -->
+                </div>
+
+                <div id="advisor-discussion-container" class="hidden my-6">
+                    <h3 class="font-bold text-lg mb-2 text-yellow-400 border-b-2 border-gray-600 pb-2">자문회 토론</h3>
+                    <div id="advisor-discussion-log" class="mt-4 space-y-2 text-sm bg-gray-900 p-4 rounded-md  max-h-48 overflow-y-auto">
+                        <!-- Discussion log will be rendered here -->
+                    </div>
+                     <div class="mt-4 flex gap-2">
+                         <textarea id="advisor-input" class="modal-input flex-grow" rows="1" placeholder="자유롭게 질문하여 회의를 이어가세요..."></textarea>
+                         <button onclick="continueMainScreenDiscussion()" class="px-4 py-2 bg-green-700 hover:bg-green-800 rounded-md font-bold text-white">전송</button>
+                     </div>
+                </div>
+
+                <div id="choices-container" class="mt-8 border-t-2 border-gray-600 pt-6">
+                    <h3 id="choices-prompt" class="font-bold text-lg mb-4 text-yellow-400"></h3>
+                    <div id="choices-list" class="space-y-3">
+                        <!-- Choices will be rendered here by JS -->
+                    </div>
+                    <div id="custom-action-container" class="mt-6 pt-4 border-t border-dashed border-gray-500">
+                        <h4 class="text-md font-bold text-gray-400 mb-2">혹은, 직접 행동을 지시하십시오:</h4>
+                        <div class="flex gap-2">
+                            <textarea id="custom-action-input" class="modal-input flex-grow" rows="2" placeholder="예: '장군을 즉시 소환하여 군사 회의를 열어라.' 또는 '국고를 확인하고 예산을 재분배하라.'"></textarea>
+                            <button onclick="handleCustomAction()" class="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-md font-bold text-black" title="AI에게 자유로운 명령을 내립니다.">지시</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <audio id="tts-audio-player" class="hidden"></audio>
+
+<script>
+// --- GLOBAL API KEY & SETTINGS ---
+let userApiKey = "";
+let useCustomImageApi = false;
+
+// --- GAME DATA & CONFIG ---
+const TECH_LEVEL_NAMES = [
+    "선사 시대",     // Level 0
+    "기초과학 수준", // Level 1
+    "응용과학 태동", // Level 2
+    "체계적 연구",   // Level 3
+    "기술적 혁신",   // Level 4
+    "과학의 선구자", // Level 5
+    "원자력 시대",   // Level 6
+    "디지털 시대",   // Level 7
+    "정보화 시대",   // Level 8
+    "우주 개척 시대", // Level 9
+    "초기술 시대"   // Level 10
+];
+
+const STAT_TRANSLATIONS = {
+    stability: '국가 안정도',
+    approval: '지지도',
+    politicalPower: '권력',
+    treasury: '국고',
+    manpower: '가용 인력',
+    resources: '국가 자원',
+    techLevel: '기술 수준',
+    powerInfluence: '권력 영향력',
+    stability_bonus: '국가 안정도',
+    approval_bonus: '지지도',
+    politicalPower_bonus: '권력',
+    local_autonomy: '지방 자치도',
+    stability_loss_threshold: '안정도 하락 임계치',
+    long_term_project_success_rate: '장기 프로젝트 성공률',
+    treasury_consumption_modifier: '국고 소모율',
+    advisor_satisfaction: '자문회 만족도'
+};
+
+
+const HISTORICAL_KEYWORDS = {
+    'default': {
+        positive: 'historical painting, detailed, cinematic lighting',
+        negative: 'text, watermark, signature, modern clothing'
+    },
+    '조선': {
+        positive: 'Joseon dynasty, hanbok, traditional Korean architecture, palace, gwana, gat',
+        negative: 'text, watermark, signature, modern clothing, samurai, ninja'
+    },
+    '로마': {
+        positive: 'Roman empire, toga, senate, legionary armor, laurels, marble architecture',
+        negative: 'text, watermark, signature, modern clothing, knights'
+    }
+};
+
+// --- UTILITY FUNCTIONS ---
+
+function advanceTimeAndAnimate(duration, onComplete) {
+    if (!game.state || !game.state.world) {
+        if(onComplete) onComplete();
+        return;
+    }
+
+    const startDate = new Date(game.state.world.date);
+    let endDate = new Date(startDate);
+
+    endDate.setDate(endDate.getDate() + (duration.days || 0));
+    endDate.setHours(endDate.getHours() + (duration.hours || 0));
+    endDate.setMinutes(endDate.getMinutes() + (duration.minutes || 0));
+    endDate.setSeconds(endDate.getSeconds() + (duration.seconds || 0));
+    
+    const dateEl = document.getElementById('time-panel-date');
+    const timeEl = document.getElementById('time-panel-time');
+
+    if (!dateEl || !timeEl) {
+        game.state.world.date = endDate.toISOString();
+        if (onComplete) onComplete();
+        return;
+    }
+    
+    const originalState = JSON.parse(JSON.stringify(game.state));
+    const totalSecondsToAdd = (endDate - startDate) / 1000;
+    const totalDaysToAdd = totalSecondsToAdd / (24 * 60 * 60);
+    const income = game.state.playerNation.income || { treasury: 10, manpower: 5, resources: 1 };
+
+    const totalChanges = {
+        treasury: (income.treasury || 0) * totalDaysToAdd,
+        manpower: (income.manpower || 0) * totalDaysToAdd,
+        resources: (income.resources || 0) * totalDaysToAdd,
+        factions: {},
+        internalFactions: {}
+    };
+    
+    game.state.factions.forEach(f => {
+        totalChanges.factions[f.id] = (Math.random() - 0.5) * totalDaysToAdd * 0.5; // Small random drift
+    });
+    game.state.internalFactions.forEach(f => {
+        totalChanges.internalFactions[f.id] = (Math.random() - 0.5) * totalDaysToAdd * 0.5; // Small random drift
+    });
+
+    let currentAnimDate = new Date(startDate);
+    const totalDurationMs = 1500;
+    const intervalTime = 50;
+    const totalSteps = totalDurationMs / intervalTime;
+
+    let step = 0;
+    const timer = setInterval(() => {
+        step++;
+        const proportion = step / totalSteps;
+
+        if (step >= totalSteps) {
+            clearInterval(timer);
+            game.state = originalState;
+            game.state.world.date = endDate.toISOString();
+            game.state.playerNation.treasury += totalChanges.treasury;
+            game.state.playerNation.manpower += totalChanges.manpower;
+            game.state.playerNation.resources += totalChanges.resources;
+            game.state.factions.forEach(f => f.relationship = Math.max(-100, Math.min(100, f.relationship + (totalChanges.factions[f.id] || 0))));
+            game.state.internalFactions.forEach(f => f.loyalty = Math.max(0, Math.min(100, f.loyalty + (totalChanges.internalFactions[f.id] || 0))));
+
+            game.Renderer.renderUIPanel();
+            game.Renderer.renderCollapsiblePanels();
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const newTimestamp = startDate.getTime() + (endDate.getTime() - startDate.getTime()) * proportion;
+        currentAnimDate.setTime(newTimestamp);
+        dateEl.textContent = formatHistoricalDate(currentAnimDate.toISOString());
+        timeEl.textContent = currentAnimDate.toTimeString().split(' ')[0];
+
+        game.state.playerNation.treasury = originalState.playerNation.treasury + totalChanges.treasury * proportion;
+        game.state.playerNation.manpower = originalState.playerNation.manpower + totalChanges.manpower * proportion;
+        game.state.playerNation.resources = originalState.playerNation.resources + totalChanges.resources * proportion;
+
+        game.state.factions.forEach((f, index) => {
+            const finalValue = originalState.factions[index].relationship + (totalChanges.factions[f.id] || 0) * proportion;
+            f.relationship = Math.max(-100, Math.min(100, finalValue));
+        });
+        game.state.internalFactions.forEach((f, index) => {
+             const finalValue = originalState.internalFactions[index].loyalty + (totalChanges.internalFactions[f.id] || 0) * proportion;
+            f.loyalty = Math.max(0, Math.min(100, finalValue));
+        });
+        
+        game.Renderer.renderUIPanel();
+        game.Renderer.renderCollapsiblePanels();
+    }, intervalTime);
+}
+
+function estimateTimeForAction(text) {
+    if (!text) return { hours: 1 };
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes('전쟁') || lowerText.includes('원정') || lowerText.includes('건설') || lowerText.includes('이동')) {
+        return { days: Math.floor(Math.random() * 10) + 1 };
+    }
+    if (lowerText.includes('회의') || lowerText.includes('토론') || lowerText.includes('논의') || lowerText.includes('만찬')) {
+        return { hours: Math.floor(Math.random() * 4) + 2 };
+    }
+    if (lowerText.length > 50) {
+        return { minutes: Math.floor(Math.random() * 45) + 15 };
+    }
+    return { minutes: Math.floor(Math.random() * 10) + 5 };
+}
+
+
+function formatHistoricalDate(dateString) {
+    try {
+        const d = new Date(dateString);
+        let year = d.getUTCFullYear();
+        const month = d.getUTCMonth() + 1;
+        const day = d.getUTCDate();
+
+        if (year < 0) {
+            return `기원전 ${Math.abs(year)}년 ${month}월 ${day}일`;
+        }
+        return `${year}년 ${month}월 ${day}일`;
+    } catch(e) {
+        return "날짜 오류";
+    }
+}
+
+
+function parseKoreanDateToISO(dateString) {
+    if (!dateString || typeof dateString !== 'string') return new Date().toISOString();
+
+    let year, month = 1, day = 1;
+    const isBC = dateString.includes('기원전');
+    const numbers = dateString.match(/\d+/g);
+
+    if (!numbers || numbers.length === 0) return new Date().toISOString();
+
+    year = parseInt(numbers[0], 10);
+    if (isBC) {
+        year = -year;
+    }
+
+    if (numbers.length > 1) month = parseInt(numbers[1], 10);
+    if (numbers.length > 2) day = parseInt(numbers[2], 10);
+
+    month = Math.max(1, Math.min(12, month));
+    day = Math.max(1, Math.min(31, day));
+
+    // Use UTC to avoid timezone issues
+    const d = new Date(Date.UTC(year, month - 1, day, 9, 0, 0));
+    return d.toISOString();
+}
+
+
+function base64ToArrayBuffer(base64) {
+    const binary_string = window.atob(base64);
+    const len = binary_string.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+function pcmToWav(pcmData, sampleRate) {
+    const numChannels = 1; const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const dataSize = pcmData.length * (bitsPerSample / 8);
+    const chunkSize = 36 + dataSize;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    view.setUint32(0, 0x52494646, false); // "RIFF"
+    view.setUint32(4, chunkSize, true);
+    view.setUint32(8, 0x57415645, false); // "WAVE"
+    view.setUint32(12, 0x666d7420, false); // "fmt "
+    view.setUint32(16, 16, true); // PCM format
+    view.setUint16(20, 1, true); // Audio format 1
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    view.setUint32(36, 0x64617461, false); // "data"
+    view.setUint32(40, dataSize, true);
+    for (let i = 0; i < pcmData.length; i++) {
+        view.setInt16(44 + i * 2, pcmData[i], true);
+    }
+    return new Blob([view], { type: 'audio/wav' });
+}
+
+function calculatePolicyCost(effects) {
+    if (!effects) return 50;
+    const weights = {
+        stability: 10, approval: 8, politicalPower: 12, treasury: 0.5,
+        manpower: 0.0001, resources: 2, techLevel: 50, loyalty: 5
+    };
+    let calculatedCost = 0;
+    for (const [key, value] of Object.entries(effects)) {
+        let effectType = key.split('_')[0];
+        if (key.includes('loyalty')) effectType = 'loyalty';
+        const weight = weights[effectType] || 1;
+        calculatedCost += value * weight;
+    }
+    let finalCost = 50 + calculatedCost;
+    finalCost = Math.max(25, finalCost);
+    finalCost = Math.ceil(finalCost / 5) * 5;
+    return finalCost;
+}
+
+function getCurrencySymbol(dateString, nationName = '') {
+    const yearMatch = dateString.match(/^(-?\d+)/);
+    if (!yearMatch) return '💰';
+    const year = parseInt(yearMatch[1], 10);
+
+    // 1. Nation-specific logic (prioritized)
+    const lowerNationName = nationName.toLowerCase();
+    if (lowerNationName.includes('조선') || lowerNationName.includes('korea') || lowerNationName.includes('대한제국')) {
+        if (year >= 1902) return '₩';
+        if (year >= 1400) return '냥';
+        return '文';
+    }
+    if (lowerNationName.includes('로마') || lowerNationName.includes('rome')) {
+        return 'D'; // Denarius
+    }
+    if (lowerNationName.includes('일본') || lowerNationName.includes('japan')) {
+        if (year >= 1871) return '¥';
+        return '文'; // Mon
+    }
+    if (lowerNationName.includes('중국') || lowerNationName.includes('china')) {
+        if (year >= 1948) return '¥';
+        if (year >= 1368) return '両'; // Tael
+        return '文'; // Wen
+    }
+    if (lowerNationName.includes('영국') || lowerNationName.includes('england') || lowerNationName.includes('britain')) {
+        return '£';
+    }
+    if (lowerNationName.includes('프랑스') || lowerNationName.includes('france')) {
+        if (year >= 1795) return '₣';
+        return 'L'; // Livre
+    }
+    if (lowerNationName.includes('미국') || lowerNationName.includes('america')) {
+        return '$';
+    }
+    if (lowerNationName.includes('스페인') || lowerNationName.includes('spain')) {
+         if (year >= 1869) return '₧';
+        return '$'; // Spanish Dollar (Peso) was the origin of the dollar sign
+    }
+    if (lowerNationName.includes('독일') || lowerNationName.includes('germany')) {
+        if (year >= 1924 && year <= 1948) return 'ℛℳ'; // Reichsmark
+        if (year >= 1873) return 'ℳ'; // Mark
+        return 'ƒ'; // Gulden/Florin
+    }
+    if (lowerNationName.includes('이탈리아') || lowerNationName.includes('italy')) {
+    if (year >= 1861) return '₤'; // Lira
+    return 'S'; // Solidus or Florin
+    }
+
+    if (lowerNationName.includes('러시아') || lowerNationName.includes('russia')) {
+    if (year >= 1998) return '₽';
+    return 'руб';
+    }
+
+    // 2. Generic era-based logic as fallback
+    if (year < -500) return '₯'; // Drachma (Ancient Greece)
+    if (year >= -500 && year < 1450) return 'S'; // Solidus (Byzantium/Rome)
+    if (year >= 1450 && year < 1800) return '$'; // Spanish Dollar's influence
+    if (year >= 1800 && year < 1945) return '£'; // Pound Sterling's dominance
+    if (year >= 1945) {
+        if (year >= 1999) return '€'; // Euro as a modern example
+        return '$'; // US Dollar dominance
+    }
+
+    return '💰'; // Final fallback
+}
+
+function formatNumberWithKoreanUnits(num) {
+    if (typeof num !== 'number') return num;
+    const absNum = Math.abs(num);
+    if (absNum < 1000000) { 
+        return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+    const units = [
+        { value: 1e12, name: '조' },
+        { value: 1e8, name: '억' },
+        { value: 1e6, name: '백만' }
+    ];
+    for (const unit of units) {
+        if (absNum >= unit.value) {
+            const val = num / unit.value;
+            const formattedVal = parseFloat(val.toFixed(2)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return `${formattedVal}${unit.name}`;
+        }
+    }
+    return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+
+// --- GEMINI API INTEGRATION ---
+const GEMINI = {
+    async callGeminiApi(systemPrompt, userPrompt, retries = 3, delay = 1000) {
+        document.getElementById('gemini-loading-overlay').classList.remove('hidden');
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${userApiKey}`;
+        const payload = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+        };
+        try {
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) {
+                if (response.status === 429 && retries > 0) {
+                    await new Promise(res => setTimeout(res, delay));
+                    return this.callGeminiApi(systemPrompt, userPrompt, retries - 1, delay * 2);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            const candidate = result.candidates?.[0];
+            if (candidate && candidate.content?.parts?.[0]?.text) {
+                return candidate.content.parts[0].text;
+            } else {
+                console.error("Invalid response structure from Gemini API:", result); return null;
+            }
+        } catch (error) {
+            console.error("Gemini API call failed:", error); 
+            showInfoModal("API 호출 오류", `API 호출 중 오류가 발생했습니다: ${error.message}`);
+            return null;
+        } finally {
+            document.getElementById('gemini-loading-overlay').classList.add('hidden');
+        }
+    },
+
+    async callTtsApi(text) {
+        document.getElementById('gemini-loading-overlay').classList.remove('hidden');
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${userApiKey}`;
+        const payload = {
+            contents: [{ parts: [{ text: `Please read the following text in a clear, narrative tone for a historical game: ${text}` }] }],
+            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } } },
+            model: "gemini-2.5-flash-preview-tts"
+        };
+        try {
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) { throw new Error(`TTS API error! status: ${response.status}`); }
+            const result = await response.json();
+            const part = result?.candidates?.[0]?.content?.parts?.[0];
+            const audioData = part?.inlineData?.data;
+            const mimeType = part?.inlineData?.mimeType;
+            if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                const pcmData = base64ToArrayBuffer(audioData);
+                const pcm16 = new Int16Array(pcmData);
+                const wavBlob = pcmToWav(pcm16, sampleRate);
+                return URL.createObjectURL(wavBlob);
+            } else {
+                console.error("Invalid TTS response structure:", result); return null;
+            }
+        } catch (error) {
+            console.error("TTS API call failed:", error); 
+            showInfoModal("오디오 생성 실패", `오디오 생성에 실패했습니다: ${error.message}`);
+            return null;
+        } finally {
+            document.getElementById('gemini-loading-overlay').classList.add('hidden');
+        }
+    },
+
+    async generateImage(prompt, retries = 3, delay = 1000) {
+        let apiUrl, payload, apiKeyForImage;
+        if (useCustomImageApi && userApiKey) {
+            apiKeyForImage = userApiKey;
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKeyForImage}`;
+            payload = {
+                instances: [{ prompt: prompt }],
+                parameters: { "sampleCount": 1 }
+            };
+        } else {
+            apiKeyForImage = "";
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKeyForImage}`;
+            payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseModalities: ['IMAGE'] },
+            };
+        }
+        try {
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) {
+                if (response.status === 429 && retries > 0) {
+                    await new Promise(res => setTimeout(res, delay));
+                    return this.generateImage(prompt, retries - 1, delay * 2);
+                }
+                throw new Error(`Image generation HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            let base64Data;
+            if (useCustomImageApi && userApiKey) {
+                base64Data = result.predictions?.[0]?.bytesBase64Encoded;
+            } else {
+                base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+            }
+            if (base64Data) {
+                return `data:image/png;base64,${base64Data}`;
+            } else {
+                if (result.candidates?.[0]?.finishReason === "SAFETY") {
+                    console.warn("Image generation blocked by safety filters.");
+                    return null;
+                }
+                console.error("Invalid response structure from Image API:", result);
+                return null;
+            }
+        } catch (error) {
+            if (error.message && error.message.includes("429")) {
+                console.warn("Image generation rate limit exceeded. Please wait a moment before trying again.");
+            } else {
+                console.error("Image API call failed:", error);
+            }
+            return null;
+        }
+    }
+};
+
+// --- NATIONAL SPIRIT DATA ---
+const NATIONAL_SPIRITS = {
+    strong_military_tradition: {
+        name: "굳건한 군사 전통",
+        description: "거듭된 군사적 승리로 인해 군을 중시하는 강력한 전통이 확립되었습니다.",
+        trigger: (tendencies) => tendencies.military >= 3 && tendencies.aggressive >= 2,
+        effects: { positive: ["신규 장군 경험치 +10"], negative: ["외교 활동 시 우호도 획득 -5%"], stats: { manpower_bonus: 10000, politicalPower_penalty: -5 } }
+    },
+    reliance_on_foreign_powers: {
+        name: "외세 의존 정책",
+        description: "외교와 동맹에 반복적으로 의존하여, 국가의 정책이 외세에 쉽게 휘둘리게 되었습니다.",
+        trigger: (tendencies) => tendencies.diplomacy >= 4,
+        effects: { positive: ["동맹국과의 관계 개선 +15%"], negative: ["국가 안정도 -5"], stats: { stability_penalty: -5 } }
+    },
+    veteran_officer_corps: {
+        name: "노련한 장교단",
+        description: "수많은 전쟁을 거치며 단련된 장교단이 강력한 지휘 체계를 형성했습니다.",
+        trigger: (tendencies) => tendencies.military >= 5,
+        effects: { 
+            positive: ["가용 인력 +15,000"], 
+            negative: ["권력 획득에 소폭 페널티"], 
+            stats: { manpower_bonus: 15000, politicalPower_penalty: -5 } 
+        }
+    },
+    military_overreach: {
+        name: "군의 과도한 영향력",
+        description: "군의 권력이 과도하게 커져 정부의 통제력이 약화되었습니다. 쿠데타의 위험이 감지됩니다.",
+        trigger: (tendencies, state) => tendencies.military >= 5 && state.playerNation.stability < 40,
+        effects: { 
+            positive: [], 
+            negative: ["권력 획득량 -10", "국가 안정도 -5"], 
+            stats: { politicalPower_penalty: -10, stability_penalty: -5 } 
+        }
+    },
+    bureaucracy_established: {
+        name: "관료제 확립",
+        description: "잘 정비된 행정 체계 덕분에 국가가 효율적으로 운영됩니다.",
+        trigger: (tendencies) => tendencies.internal >= 5,
+        effects: { 
+            positive: ["권력 획득량 +10", "지지도 +5"], 
+            negative: [], 
+            stats: { politicalPower_bonus: 10, approval_bonus: 5 } 
+        }
+    },
+    corrupt_government: {
+        name: "부패한 정부",
+        description: "관리들의 부패와 무능으로 행정 기능이 마비되고 국민의 신뢰를 잃었습니다.",
+        trigger: (tendencies, state) => state.playerNation.stability < 30 && state.playerNation.approval < 30,
+        effects: { 
+            positive: [], 
+            negative: ["권력 획득량 -15", "국가 안정도 -10"], 
+            stats: { politicalPower_penalty: -15, stability_penalty: -10 } 
+        }
+    },
+    golden_age_of_arts: {
+        name: "예술 황금기",
+        description: "문화와 예술이 전성기를 맞이하여 국민의 자긍심을 고취시키고 있습니다.",
+        trigger: (tendencies) => tendencies.economy >= 4 && tendencies.internal >= 4,
+        effects: { 
+            positive: ["지지도 +10", "권력 +5"], 
+            negative: [], 
+            stats: { approval_bonus: 10, politicalPower_bonus: 5 } 
+        }
+    },
+    rise_of_nationalism: {
+        name: "민족주의 고양",
+        description: "강력한 민족주의 사상이 국민을 하나로 묶고 있으나, 주변국과의 갈등을 유발할 수 있습니다.",
+        trigger: (tendencies) => tendencies.aggressive >= 4 && tendencies.internal >= 3,
+        effects: { 
+            positive: ["최대 인력 +5%", "안정도 +5"], 
+            negative: ["외교 관계 악화 가능성"], 
+            stats: { manpower_max_bonus: 5, stability_bonus: 5 } 
+        }
+    }
+};
+
+
+// --- CORE GAME ENGINE ---
+const game = {
+    state: {},
+    selectedAdvisors: new Set(),
+    newProposals: [],
+    isRegenerating: false,
+    advisorConversationTextHistory: "",
+    
+    /**
+     * Initializes the game with a specific scenario.
+     * @param {string} scenarioId - The ID of the scenario to load.
+     */
+    init(scenarioId) {
+        if (!Scenarios[scenarioId]) {
+            showInfoModal("시나리오 오류", `오류: 시나리오 '${scenarioId}'를 찾을 수 없습니다.`); return;
+        }
+        this.state = JSON.parse(JSON.stringify(Scenarios[scenarioId].initialState));
+        
+        // Initialize game state properties if they don't exist
+        this.state.nationalSpirits = this.state.nationalSpirits || [];
+        this.state.tendencies = { military: 0, diplomacy: 0, aggressive: 0, cautious: 0, economy: 0, internal: 0 };
+        this.state.absurdityCounter = 0;
+        this.state.playerNation.powerInfluence = this.state.playerNation.powerInfluence || 75;
+        this.state.playerNation.income = this.state.playerNation.income || { treasury: 10, manpower: 5, resources: 1 };
+
+
+        // Reset dynamic data
+        this.state.world.lastImageDescription = null;
+        this.isRegenerating = false;
+        this.advisorConversationTextHistory = "";
+        if (this.state.advisors) {
+            this.state.advisors.forEach(a => a.imageUrl = null);
+        }
+        
+        // Prepare initial event
+        const initialEvent = JSON.parse(JSON.stringify(Scenarios[scenarioId].initialEvent));
+        initialEvent.baseChoices = [...initialEvent.choices];
+        initialEvent.choices = initialEvent.choices.map(c => {
+            const choiceId = c.id;
+            const fullChoice = { ...c, execute: this.handleStandardChoice.bind(this) };
+            if (!Choices[choiceId]) {
+                Choices[choiceId] = fullChoice;
+            }
+            return fullChoice;
+        });
+        Events[this.state.world.currentEvent] = initialEvent;
+
+        this.update(null);
+    },
+
+    /**
+     * The main game loop. Processes player choice, updates state, and renders the new state.
+     * @param {object|null} playerChoice - The choice object selected by the player. Null for the initial call.
+     */
+    async update(playerChoice) {
+        if (playerChoice) {
+            const timeToAdvance = estimateTimeForAction(playerChoice.text);
+            advanceTimeAndAnimate(timeToAdvance, async () => {
+                await this.processTurn(playerChoice);
+            });
+        } else {
+             // Initial setup, no time advance
+             this.Renderer.renderAll();
+        }
+    },
+
+    async processTurn(playerChoice) {
+        // Reset UI elements for the new turn
+        document.getElementById('advisor-discussion-container').classList.add('hidden');
+        document.getElementById('advisor-discussion-log').innerHTML = '';
+        this.newProposals = [];
+
+        await this.updateTendencies(playerChoice.text);
+        
+        // Execute the logic associated with the player's choice
+        const choiceLogic = Choices[playerChoice.id] || playerChoice;
+        if (choiceLogic && typeof choiceLogic.execute === 'function') {
+            await choiceLogic.execute(this.state, choiceLogic);
+        } else {
+            console.error(`Choice logic for '${playerChoice.id}' not found or not executable.`);
+        }
+        
+        this.checkNationalSpiritFormation();
+        this.Renderer.renderAll();
+    },
+
+    
+    /**
+     * Asks the Gemini API to categorize a choice text and updates player tendencies.
+     * @param {string} text - The text of the player's chosen option.
+     */
+    async updateTendencies(text) {
+        const tags = await this.getTendencyTagsFromChoice(text);
+        if (tags.length > 0) {
+            tags.forEach(tag => {
+                if (this.state.tendencies.hasOwnProperty(tag)) {
+                    this.state.tendencies[tag]++;
+                    console.log(`Tendency updated: ${tag} = ${this.state.tendencies[tag]}`);
+                }
+            });
+        }
+    },
+    
+    /**
+     * Uses the Gemini API to get tendency tags from a choice's text.
+     * @param {string} choiceText - The text to analyze.
+     * @returns {Promise<string[]>} An array of tendency tags.
+     */
+    async getTendencyTagsFromChoice(choiceText) {
+        const systemPrompt = `You are a game system analyzer. Categorize the player's choice into one or more keywords from this list: [military, diplomacy, aggressive, cautious, economy, internal]. Respond with only a comma-separated list. For example: military, aggressive`;
+        const userPrompt = `Player's choice: "${choiceText}"`;
+        try {
+            const response = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+            if (response) {
+                return response.split(',').map(tag => tag.trim().toLowerCase());
+            }
+        } catch (e) {
+            console.error("Failed to get tendency tags:", e);
+        }
+        return [];
+    },
+    
+    /**
+     * Checks if any new National Spirits should be formed based on player tendencies.
+     */
+    checkNationalSpiritFormation() {
+        for (const spiritId in NATIONAL_SPIRITS) {
+            if (this.state.nationalSpirits.includes(spiritId)) continue;
+
+            const spirit = NATIONAL_SPIRITS[spiritId];
+            if (spirit.trigger(this.state.tendencies, this.state)) {
+                this.state.nationalSpirits.push(spiritId);
+                let effectsHtml = '<ul>';
+                 (spirit.effects.positive || []).forEach(e => effectsHtml += `<li class='text-green-400'>+ ${e}</li>`);
+                 (spirit.effects.negative || []).forEach(e => effectsHtml += `<li class='text-red-400'>- ${e}</li>`);
+                effectsHtml += '</ul>';
+
+                openReportModal(
+                    "새로운 국가 정신 형성",
+                    `당신의 결정들은 국가의 새로운 정체성을 만들어냈습니다: <br><br><strong class="text-yellow-300 text-lg">[${spirit.name}]</strong><br><p class="mt-2 text-gray-400">${spirit.description}</p><div class='mt-4'>${effectsHtml}</div>`
+                );
+            }
+        }
+    },
+
+    /**
+     * Handles a standard player choice by generating the next game event via the Gemini API.
+     * @param {object} currentState - The current game state.
+     * @param {object} playerChoice - The choice object selected by the player.
+     */
+    async handleStandardChoice(currentState, playerChoice) {
+        const systemPrompt = "You are a master storyteller and game master for 'The Sovereign's Chronicle'. Generate the next event IN KOREAN based on the player's choice. Follow these rules strictly:\n" +
+            "1.  **Use Correct Honorifics:** Address the leader with their historically accurate title.\n" +
+            "2.  **Naming Convention:** For foreign names/places, use the format 'Original (Korean Phonetic)' e.g., 'Berlin (베를린)'.\n" +
+            "3.  **Reflect Game State:** The narrative MUST reflect the current state of internal factions (especially their loyalty), national spirits, and enacted policies. For example, if the 'Aristocracy' faction has low loyalty, the narrative might mention grumbling nobles.\n" +
+            "4.  **Response Format:** Respond with ONLY the following sections, separated by '---':\n" +
+            "    NARRATIVE: [A compelling story of what happens next.]\n" +
+            "    ---\n" +
+            "    PROMPT: [A new question for the player.]\n" +
+            "    ---\n" +
+            "    CHOICE 1: [Text for the first new choice.]\n" +
+            "    ---\n" +
+            "    CHOICE 2: [Text for the second new choice.]\n" +
+            "    ---\n" +
+            "    CHOICE 3: [Text for a third new choice (optional).]\n" +
+            "    ---\n" +
+            "    EFFECTS: [A valid JSON array of game state changes. Examples: {\"type\": \"INTERNAL_FACTION_LOYALTY\", \"factionId\": \"nobility\", \"change\": -5, \"reason\": \"New tax policy\"}, {\"type\": \"RESOURCE\", \"resource\": \"treasury\", \"change\": 100, \"reason\": \"War spoils\"}]";
+
+        const factionInfo = (currentState.factions || []).map(f => `${f.name}(${f.status}, 관계 ${f.relationship})`).join(', ');
+        const internalFactionInfo = (currentState.internalFactions || []).map(f => `${f.name}(충성도 ${f.loyalty})`).join(', ');
+        const policiesInfo = (currentState.policies || []).filter(p => p.enacted).map(p => p.name).join(', ') || '없음';
+
+        const userPrompt = `CURRENT STATE for ${currentState.playerNation.name} in ${new Date(currentState.world.date).getFullYear()}:\n` +
+            `- Previous Event: "${Events[currentState.world.currentEvent].narrative}"\n` +
+            `- Foreign Factions: ${factionInfo}\n` +
+            `- Internal Factions: ${internalFactionInfo}\n` +
+            `- Enacted Policies: ${policiesInfo}\n` +
+            `PLAYER'S CHOICE: "${playerChoice.text}"\n` +
+            'Generate the next event, narrative, choices, and a JSON array for EFFECTS.';
+        
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) {
+            showInfoModal("진행 불가", "AI가 다음 이야기를 만드는 데 실패했습니다.");
+            return;
+        }
+
+        const newEvent = this.parseNarrativeResponse(responseText);
+        if (!newEvent) {
+            showInfoModal("진행 불가", "AI의 응답 형식이 올바르지 않아 이야기를 계속할 수 없습니다.");
+            return;
+        }
+
+        Events[newEvent.id] = newEvent;
+        currentState.world.currentEvent = newEvent.id;
+    },
+
+    /**
+     * Parses the multi-part response from the Gemini API into a structured event object.
+     * @param {string} text - The raw text response from the API.
+     * @returns {object|null} A new event object or null if parsing fails.
+     */
+    parseNarrativeResponse(text) {
+        try {
+            const newEvent = { id: 'event_' + Date.now() + Math.random(), choices: [] };
+            const effectsRegex = /EFFECTS:\s*(\[[\s\S]*\])/;
+            const effectsMatch = text.match(effectsRegex);
+            let effectsJson = [];
+
+            if (effectsMatch && effectsMatch[1]) {
+                try {
+                    effectsJson = JSON.parse(effectsMatch[1]);
+                    this.applyEffects(effectsJson);
+                } catch (e) {
+                    console.error("Failed to parse EFFECTS JSON:", e, "Raw JSON:", effectsMatch[1]);
+                }
+            }
+            
+            const cleanText = text.replace(effectsRegex, '');
+            const sections = cleanText.split('---').map(s => s.trim());
+            
+            sections.forEach(section => {
+                if (section.startsWith('NARRATIVE:')) newEvent.narrative = section.substring('NARRATIVE:'.length).trim();
+                else if (section.startsWith('PROMPT:')) newEvent.prompt = section.substring('PROMPT:'.length).trim();
+                else if (section.match(/^CHOICE\s*\d:/)) {
+                    const choiceText = section.substring(section.indexOf(':') + 1).trim();
+                    if (choiceText) {
+                        const choiceId = `choice_${newEvent.id}_${newEvent.choices.length + 1}`;
+                        const newChoice = { 
+                            id: choiceId, 
+                            text: choiceText, 
+                            description: "AI가 생성한 동적 선택지입니다.",
+                            execute: this.handleStandardChoice.bind(this)
+                        };
+                        newEvent.choices.push(newChoice);
+                        Choices[choiceId] = newChoice;
+                    }
+                }
+            });
+
+            if (!newEvent.narrative || !newEvent.prompt || newEvent.choices.length === 0) {
+                console.error("Parsed event is missing required fields.", newEvent, "Raw text:", text);
+                return null;
+            }
+            newEvent.baseChoices = [...newEvent.choices];
+            return newEvent;
+        } catch (e) {
+            console.error("Failed to parse AI narrative response:", e, "Raw text:", text);
+            return null;
+        }
+    },
+    
+    /**
+     * Applies an array of effect objects to the current game state.
+     * @param {object[]} effects - An array of effect objects from the API.
+     */
+    applyEffects(effects) {
+        if (!Array.isArray(effects)) return;
+
+        effects.forEach(effect => {
+            try {
+                switch(effect.type) {
+                    case 'INTERNAL_FACTION_LOYALTY':
+                        const faction = this.state.internalFactions.find(f => f.id === effect.factionId);
+                        if(faction) {
+                            faction.loyalty = Math.max(0, Math.min(100, faction.loyalty + effect.change));
+                        }
+                        break;
+                    case 'RESOURCE':
+                        if (this.state.playerNation.hasOwnProperty(effect.resource)) {
+                            this.state.playerNation[effect.resource] += effect.change;
+                        }
+                        break;
+                    case 'NEW_LEADER_TRAIT':
+                         if (effect.trait && !this.state.leaderTraits.some(t => t.id === effect.trait.id)) {
+                             this.state.leaderTraits.push(effect.trait);
+                             showInfoModal("새로운 지도자 특성", `당신은 '[${effect.trait.name}]' 특성을 얻었습니다.`);
+                         }
+                        break;
+                }
+            } catch (e) {
+                console.error("Error applying effect:", effect, e);
+            }
+        });
+    },
+
+    /**
+     * Determines a context for the image generation prompt based on keywords in the narrative.
+     * @param {string} narrative - The event narrative.
+     * @returns {string} A context string for the prompt.
+     */
+    getImagePromptContext(narrative) {
+        if (narrative.includes('토론') || narrative.includes('원로원') || narrative.includes('회의') || narrative.includes('조정') || narrative.includes('외교')) return "This is a political and diplomatic scene. Depict leaders and advisors in a tense discussion inside a historically accurate building like a senate, palace, or court. Focus on expressions and political intrigue, not combat.";
+        if (narrative.includes('전쟁') || narrative.includes('군대') || narrative.includes('함대') || narrative.includes('병력') || narrative.includes('전투') || narrative.includes('함락')) return "This is a military scene. Depict armies preparing for battle, fleets on the sea, or a tense military standoff. Focus on the scale and tension of the forces involved.";
+        if (narrative.includes('백성') || narrative.includes('시민') || narrative.includes('시장') || narrative.includes('도시')) return "This is a social scene focusing on the populace. Depict citizens in a city square, marketplace, or reacting to events. Focus on the mood of the people and the daily life of the era.";
+        return "This is a general historical scene. Interpret the narrative to create a compelling and accurate image.";
+    },
+
+    /**
+     * The Renderer object handles all updates to the DOM.
+     */
+    Renderer: {
+        async renderAll() {
+            await this.renderNarrative();
+            this.renderUIPanel();
+            this.renderCollapsiblePanels();
+            this.renderChoices();
+        },
+        async renderNarrative() {
+            const narrativeContainer = document.getElementById('narrative-output');
+            narrativeContainer.innerHTML = '';
+            
+            const event = Events[game.state.world.currentEvent];
+            if (!event) {
+                narrativeContainer.innerHTML = "<p>사건을 불러오는 중이거나 오류가 발생했습니다.</p>";
+                document.getElementById('event-image-container').innerHTML = ''; 
+                return;
+            }
+
+            this.generateAndDisplayImage();
+
+            const speakerIcon = `<span onclick="playNarrativeAudio(this)" class="speaker-button" title="내레이션 듣기"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg></span>`;
+            let narrativeHtml = `<div><p id="narrative-text" class="inline">${event.narrative.replace(/\n/g, '<br>')}</p>${speakerIcon}</div>`;
+            narrativeContainer.innerHTML = narrativeHtml;
+        },
+
+        async generateAndDisplayImage() {
+            const imageContainer = document.getElementById('event-image-container');
+            imageContainer.innerHTML = `<div class="text-center text-gray-500"><div class="spinner" style="margin: auto;"></div><p class="mt-2 text-sm">✨ 장면 생성 중...</p></div>`;
+            const event = Events[game.state.world.currentEvent];
+            const nationName = game.state.playerNation.name;
+            const keywords = HISTORICAL_KEYWORDS[nationName] || HISTORICAL_KEYWORDS['default'];
+            const sceneContext = game.getImagePromptContext(event.narrative);
+            let continuityPrompt = game.state.world.lastImageDescription ? `\n**PREVIOUS SCENE REFERENCE:** The previous image was described as: "${game.state.world.lastImageDescription}". Maintain a consistent art style, lighting, and mood unless the narrative indicates a major shift.` : "";
+            
+            let imagePrompt = 'Create a realistic, cinematic, historical painting for a text-adventure game. IMPORTANT: Do not write any words, letters, subtitles, or characters on the image itself. The image should be clean of any text.\n';
+            imagePrompt += `**Primary Instruction:** ${sceneContext}\n`;
+            imagePrompt += `**Narrative to Depict:** "${event.narrative}"\n`;
+            imagePrompt += `**Setting:** ${nationName}, year ${new Date(game.state.world.date).getFullYear()}.\n`;
+            imagePrompt += `**Key Theme:** ${event.prompt || "Historical Scene"}.\n`;
+            imagePrompt += '**Artistic Constraints:**\n';
+            imagePrompt += `* MUST Include: ${keywords.positive}.\n`;
+            imagePrompt += `* MUST AVOID: ${keywords.negative}.`;
+            imagePrompt += continuityPrompt;
+            
+            const imageUrl = await GEMINI.generateImage(imagePrompt);
+            
+            if (imageUrl) {
+                imageContainer.innerHTML = `
+                    <img src="${imageUrl}" alt="${event.prompt}" class="w-full h-full object-cover animate-fadeIn cursor-pointer" onclick="openImageModal(this.src)">
+                    <button onclick="regenerateCurrentImage()" title="다른 이미지 생성" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M22 11.5A10 10 0 0 0 3.5 12.5"/><path d="M2 12.5a10 10 0 0 0 18.5-1"/></svg>
+                    </button>`;
+                if (!game.isRegenerating) {
+                    game.state.world.lastImageDescription = `A ${sceneContext.toLowerCase()} in ${nationName} depicting: ${event.narrative}`;
+                }
+            } else {
+                imageContainer.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">장면을 생성할 수 없습니다.</div>
+                <button onclick="regenerateCurrentImage()" title="다른 이미지 생성" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M22 11.5A10 10 0 0 0 3.5 12.5"/><path d="M2 12.5a10 10 0 0 0 18.5-1"/></svg>
+                </button>`;
+            }
+             game.isRegenerating = false;
+        },
+        
+        createStatTooltip(statLabel, statKey, unit = '', dynamicModifiers = []) {
+            const baseStats = game.state.playerNation;
+            if (baseStats[statKey] === undefined) return { finalValue: 0, tooltipHtml: '', modifier: 0 };
+
+            const baseValue = baseStats[statKey];
+            const baseModifiers = (baseStats.modifiers && baseStats.modifiers[statKey]) ? baseStats.modifiers[statKey] : [];
+            const allGeneralModifiers = [...baseModifiers, ...dynamicModifiers];
+            
+            let spiritModifierValue = 0;
+            let spiritModifierLines = [];
+
+            (game.state.nationalSpirits || []).forEach(spiritId => {
+                const spirit = NATIONAL_SPIRITS[spiritId];
+                if (spirit && spirit.effects.stats) {
+                    Object.keys(spirit.effects.stats).forEach(stat => {
+                        if (stat.startsWith(statKey)) {
+                            const value = spirit.effects.stats[stat];
+                            if(typeof value === 'number'){
+                                spiritModifierValue += value;
+                                const color = value >= 0 ? 'text-green-400' : 'text-red-400';
+                                const sign = value >= 0 ? '+' : '';
+                                spiritModifierLines.push(`<li><span class='${color}'>${spirit.name}:</span> <span class='float-right ${color}'>${sign}${value}${unit}</span></li>`);
+                            }
+                        }
+                    });
+                }
+            });
+
+
+            let generalModifierValue = 0;
+            let generalModifierLines = [];
+            if (allGeneralModifiers.length > 0) {
+                allGeneralModifiers.forEach(mod => {
+                    generalModifierValue += mod.value;
+                    const color = mod.value >= 0 ? 'text-green-400' : 'text-red-400';
+                    const sign = mod.value >= 0 ? '+' : '';
+                    generalModifierLines.push(`<li><span class='${color}'>${mod.name}:</span> <span class='float-right ${color}'>${sign}${mod.value.toLocaleString()}${unit}</span></li>`);
+                });
+            }
+
+            let traitModifierValue = 0;
+            let traitModifierLines = [];
+
+            if (game.state.leaderTraits) {
+                game.state.leaderTraits.forEach(trait => {
+                    if (trait.effects) {
+                        const effectKey = Object.keys(trait.effects).find(k => k.startsWith(statKey));
+                        if (effectKey) {
+                            const value = trait.effects[effectKey];
+                            if (typeof value === 'number') {
+                                traitModifierValue += value;
+                                const color = value >= 0 ? 'text-green-400' : 'text-red-400';
+                                const sign = value >= 0 ? '+' : '';
+                                traitModifierLines.push(`<li><span class='${color}'>${trait.name}:</span> <span class='float-right ${color}'>${sign}${value.toLocaleString()}${unit}</span></li>`);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            let policyModifierValue = 0;
+            let policyModifierLines = [];
+
+            if (game.state.policies) {
+                game.state.policies.filter(p => p.enacted).forEach(policy => {
+                    if (policy.effects) {
+                        const effectKey = Object.keys(policy.effects).find(k => k.startsWith(statKey) && (k.endsWith('_bonus') || k.endsWith('_penalty')));
+                        if (effectKey) {
+                            const value = policy.effects[effectKey];
+                            policyModifierValue += value;
+                            const color = value >= 0 ? 'text-green-400' : 'text-red-400';
+                            const sign = value >= 0 ? '+' : '';
+                            policyModifierLines.push(`<li><span class='${color}'>${policy.name}:</span> <span class='float-right ${color}'>${sign}${value.toLocaleString()}${unit}</span></li>`);
+                        }
+                    }
+                });
+            }
+
+            const finalValue = baseValue + spiritModifierValue + generalModifierValue + traitModifierValue + policyModifierValue;
+            const modifier = finalValue - baseValue;
+
+            let tooltipHtml = `<strong class='text-yellow-300'>${statLabel} 상세</strong><p class='text-xs my-1 text-gray-400'>${statLabel}에 대한 설명입니다.</p><ul class='mt-2 space-y-1'>`;
+            tooltipHtml += `<li>기본: <span class='float-right'>${(statKey === 'treasury' ? formatNumberWithKoreanUnits(baseValue) : (Math.floor(baseValue)).toLocaleString())}${unit}</span></li>`;
+            
+            if (generalModifierLines.length === 0 && spiritModifierLines.length === 0 && traitModifierLines.length === 0 && policyModifierLines.length === 0) {
+                tooltipHtml += `<li><span class='text-gray-400'>수정치 없음</span></li>`;
+            } else {
+                tooltipHtml += generalModifierLines.join('');
+                tooltipHtml += spiritModifierLines.join('');
+                tooltipHtml += traitModifierLines.join('');
+                tooltipHtml += policyModifierLines.join('');
+            }
+            
+            if (statKey === 'techLevel') {
+                const techName = TECH_LEVEL_NAMES[Math.min(finalValue, TECH_LEVEL_NAMES.length - 1)] || '미지';
+                tooltipHtml += `<li><span class='text-gray-400'>단계:</span> <span class='float-right text-cyan-400'>${techName}</span></li>`;
+            }
+             if (statKey === 'powerInfluence') {
+                let desc = '꼭두각시 군주';
+                if (finalValue > 80) desc = '절대 권력';
+                else if (finalValue > 60) desc = '공고한 권력';
+                else if (finalValue > 40) desc = '안정적인 통치';
+                else if (finalValue > 20) desc = '불안정한 권위';
+                tooltipHtml += `<li><span class='text-gray-400'>단계:</span> <span class='float-right text-cyan-400'>${desc}</span></li>`;
+            }
+
+            tooltipHtml += `<hr class='border-gray-600 my-1'><li class='font-bold'>최종 합계: <span class='float-right'>${(statKey === 'treasury' ? formatNumberWithKoreanUnits(finalValue) : (Math.floor(finalValue)).toLocaleString())}${unit}</span></li></ul>`;
+
+            return { finalValue, tooltipHtml, modifier };
+        },
+
+        renderUIPanel() {
+            const uiContainer = document.getElementById('ui-panel-container');
+            const baseStats = game.state.playerNation;
+            if (!baseStats) return;
+
+            const currencyPrefix = getCurrencySymbol(game.state.world.date, game.state.playerNation.name);
+
+            let factionLoyaltyModifiers = [];
+            if (game.state.internalFactions) {
+                const enactedPolicies = game.state.policies.filter(p => p.enacted);
+                game.state.internalFactions.forEach(faction => {
+                    let finalLoyalty = faction.loyalty || 50;
+                    enactedPolicies.forEach(policy => {
+                        if (policy.effects) {
+                            const bonusKey = `${faction.id}_loyalty_bonus`;
+                            const penaltyKey = `${faction.id}_loyalty_penalty`;
+                            if (policy.effects[bonusKey]) finalLoyalty += policy.effects[bonusKey];
+                            if (policy.effects[penaltyKey]) finalLoyalty += policy.effects[penaltyKey];
+                        }
+                    });
+                    finalLoyalty = Math.max(0, Math.min(100, finalLoyalty));
+
+                    if (finalLoyalty < 35) {
+                        const penalty = -Math.ceil((faction.influence || 0) / 10);
+                        factionLoyaltyModifiers.push({ name: `${faction.name} 불만`, value: penalty });
+                    }
+                });
+            }
+            
+            const stabilityData = this.createStatTooltip('국가 안정도', 'stability', '%', factionLoyaltyModifiers);
+
+            let dynamicModifiers = {};
+            if (stabilityData.finalValue < 40) {
+                dynamicModifiers.approval = [{ name: '국가 불안', value: -10 }];
+                dynamicModifiers.politicalPower = [{ name: '정치적 혼란', value: -5 }];
+            }
+
+            const approvalData = this.createStatTooltip('지지도', 'approval', '%', dynamicModifiers.approval);
+            const politicalPowerData = this.createStatTooltip('권력', 'politicalPower', '', dynamicModifiers.politicalPower);
+            const treasuryData = this.createStatTooltip('국고', 'treasury');
+            const manpowerData = this.createStatTooltip('가용 인력', 'manpower');
+            const resourcesData = this.createStatTooltip('국가 자원', 'resources');
+            const techLevelData = this.createStatTooltip('기술 수준', 'techLevel');
+            const powerInfluenceData = this.createStatTooltip('권력 영향력', 'powerInfluence', '%');
+
+            
+            const createDisplayString = (data, statKey, unit = '', prefix = '') => {
+                let modifierText = '';
+                if (data.modifier !== 0) {
+                    const sign = data.modifier > 0 ? '+' : '';
+                    const color = data.modifier > 0 ? 'text-green-400' : 'text-red-400';
+                    const modifierUnit = (statKey === 'techLevel' || statKey === 'treasury') ? '' : unit;
+                    const modifierDisplay = (statKey === 'treasury') ? formatNumberWithKoreanUnits(data.modifier) : Math.floor(data.modifier).toLocaleString();
+                    modifierText = ` <span class="text-xs ${color}">(${sign}${modifierDisplay}${modifierUnit})</span>`;
+                }
+                if (statKey === 'techLevel') {
+                    const techName = TECH_LEVEL_NAMES[Math.min(Math.floor(data.finalValue), TECH_LEVEL_NAMES.length - 1)] || '미지';
+                    return `${prefix}${Math.floor(data.finalValue).toLocaleString()}${unit} <span class="text-xs text-gray-400">(${techName})</span>${modifierText}`;
+                }
+                const finalValueDisplay = (statKey === 'treasury') ? formatNumberWithKoreanUnits(data.finalValue) : Math.floor(data.finalValue).toLocaleString();
+                const finalUnit = (statKey === 'treasury') ? '' : unit;
+               return `${prefix}${finalValueDisplay}${finalUnit}${modifierText}`;
+            };
+            
+            const panelData = {
+                stability: { data: stabilityData, config: { label: '국가 안정도', unit: '%', color: 'text-blue-400' } },
+                approval: { data: approvalData, config: { label: '지지도', unit: '%', color: 'text-pink-400' } },
+                politicalPower: { data: politicalPowerData, config: { label: '권력', unit: '', color: 'text-purple-400' } },
+                treasury: { data: treasuryData, config: { label: '국고', unit: '', prefix: currencyPrefix + ' ', color: 'text-green-500' } },
+                manpower: { data: manpowerData, config: { label: '가용 인력', unit: 'M', color: 'text-green-400' } },
+                resources: { data: resourcesData, config: { label: '국가 자원', unit: '', color: 'text-yellow-500' } },
+                techLevel: { data: techLevelData, config: { label: '기술 수준', unit: '', color: 'text-cyan-400', prefix: 'Lv.' } },
+                powerInfluence: { data: powerInfluenceData, config: { label: '권력 영향력', unit: '%', color: 'text-red-400' } },
+            };
+
+            let panelHtml = '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">';
+            
+            for (const [statKey, item] of Object.entries(panelData)) {
+                let displayValue;
+                if (statKey === 'manpower') {
+                    const data = item.data;
+                    const modifierText = data.modifier !== 0 ? ` <span class="text-xs ${data.modifier > 0 ? 'text-green-400' : 'text-red-400'}">(${data.modifier > 0 ? '+' : ''}${(data.modifier/1000000).toFixed(2)}M)</span>` : '';
+                    displayValue = `${(data.finalValue / 1000000).toFixed(2)}M${modifierText}`;
+                } else {
+                    displayValue = createDisplayString(item.data, statKey, item.config.unit, item.config.prefix);
+                }
+                panelHtml += this.createPanelItem(item.config.label, displayValue, item.config.color, item.data.tooltipHtml);
+            }
+            
+            panelHtml += '</div>';
+            uiContainer.innerHTML = panelHtml;
+        },
+
+        renderCollapsiblePanels() {
+            this.renderCollapsiblePanel('time-panel-container', '현재 시각', game.state.world, this.getTimePanelHtml);
+            this.renderCollapsiblePanel('national-spirits-container', '국가 정신', game.state.nationalSpirits, this.getNationalSpiritsHtml);
+            this.renderCollapsiblePanel('internal-factions-container', '내부 세력', game.state.internalFactions, this.getInternalFactionsHtml);
+            this.renderCollapsiblePanel('factions-container', '주변 국가', game.state.factions, this.getExternalFactionsHtml);
+            this.renderCollapsiblePanel('leader-traits-container', '지도자 특성', game.state.leaderTraits, this.getLeaderTraitsHtml);
+        },
+        
+        getTimePanelHtml(worldState) {
+            if (!worldState || !worldState.date) return '';
+            const dateObj = new Date(worldState.date);
+            const dateString = formatHistoricalDate(worldState.date);
+            const timeString = dateObj.toTimeString().split(' ')[0];
+
+            return `<div class="text-center font-mono text-xl tracking-wider">
+                        <span id="time-panel-date">${dateString}</span>
+                        <span id="time-panel-time" class="ml-4 text-yellow-300">${timeString}</span>
+                    </div>`;
+        },
+
+        renderCollapsiblePanel(containerId, title, data, renderer) {
+            const container = document.getElementById(containerId);
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                if(containerId !== 'time-panel-container') {
+                     container.innerHTML = ''; return;
+                }
+            }
+             const icons = {
+                 '현재 시각': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>`,
+                 '국가 정신': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M14.778.085A.5.5 0 0 1 15 .5V8a.5.5 0 0 1-.314.464L14.5 8l.186.464A.5.5 0 0 1 14.5 9v7a.5.5 0 0 1-.722.454L13 16.01l-.278.454A.5.5 0 0 1 12.5 16h-11a.5.5 0 0 1-.454-.722L1 15.01l-.454-.278A.5.5 0 0 1 0 14.5v-13a.5.5 0 0 1 .278-.454L1 .01l.222-.454A.5.5 0 0 1 1.5 0h13.278zM1.5 14.722L1 14.5V1.5L1.5 1.28l.222.454L2.5 2h11v12h-11l.722.454-.222.454zM2 2.5a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-11z"/></svg>`,
+                 '내부 세력': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>`,
+                 '주변 국가': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM1.06 8.5h2.04c.143 1.298.535 2.503 1.074 3.5H2.21a6.97 6.97 0 0 1-.942-3.483zM3.63 4.5H2.21A6.97 6.97 0 0 1 3.153 1H4.7a10.87 10.87 0 0 0-.923 3.5zM4.144 8.5H1.06c.07-.639.187-1.265.34-1.856h2.478c-.068.599-.115 1.212-.134 1.856zm3.856 4.58c.458.33.98.594 1.542.793v-1.99a12.18 12.18 0 0 1-1.542-1.383zM8 1c.562.199 1.084.463 1.542.793v1.99a12.18 12.18 0 0 1-1.542 1.383zM11.856 12a12.17 12.17 0 0 1 1.542 1.383v1.99c.562-.199 1.084-.463 1.542-.793zm1.93-3.5h-2.04c-.019-.644-.066-1.257-.134-1.856h2.478c.153.59.27 1.217.34 1.856zM12.37 4.5h1.42a6.97 6.97 0 0 1 .943 3.5h-2.04c-.143-1.298-.535-2.503-1.074-3.5zm-1.144 7h2.28a7.03 7.03 0 0 1-1.074 3.5h-1.37a12.23 12.23 0 0 0 .164-3.5zm-7-7h2.28A7.03 7.03 0 0 1 5.43 1H4.06a12.23 12.23 0 0 0 .164 3.5z"/></svg>`,
+                 '지도자 특성': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/></svg>`,
+             };
+            const iconHtml = icons[title] || '';
+
+            if (containerId === 'time-panel-container') {
+                 container.innerHTML = `
+                    <div class="border border-gray-700 rounded-lg">
+                        <div class="bg-gray-700 p-2 flex items-center gap-2 text-yellow-400">
+                             ${iconHtml}
+                             <h3 class="font-bold text-md">${title}</h3>
+                        </div>
+                        <div class="p-4 bg-gray-900">${renderer(data)}</div>
+                    </div>`;
+            } else {
+                 container.innerHTML = `
+                    <div class="border border-gray-700 rounded-lg">
+                        <div class="collapsible-header bg-gray-700 p-2 flex justify-between items-center">
+                            <div class="flex items-center gap-2 text-yellow-400">
+                                ${iconHtml}
+                                <h3 class="font-bold text-md">${title}</h3>
+                            </div>
+                            <span class="arrow text-yellow-400">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div class="p-4 bg-gray-900">${renderer(data)}</div>
+                        </div>
+                    </div>`;
+            }
+        },
+
+        getInternalFactionsHtml(factions) {
+             let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">';
+             factions.forEach(faction => {
+                 let finalLoyalty = faction.loyalty || 50;
+                 const loyaltyColor = finalLoyalty > 65 ? 'text-green-400' : finalLoyalty < 35 ? 'text-red-400' : 'text-gray-300';
+                 let tooltipHtml = `<strong class='text-yellow-300'>${faction.name} 충성도</strong><p class='my-1 text-sm text-gray-400'>${faction.description || '세력에 대한 설명이 없습니다.'}</p><p class='my-1 text-sm text-cyan-400'>요구: ${faction.desire || '알 수 없음'}</p><hr class='border-gray-600 my-1'><ul class='mt-1 text-sm space-y-1'>`;
+                 tooltipHtml += `<li class='font-bold'>현재 충성도: <span class='float-right ${loyaltyColor}'>${Math.floor(finalLoyalty)}</span></li></ul><p class='mt-2 text-xs text-gray-500'>영향력: ${faction.influence || 0}</p>`;
+                 html += `
+                     <div class="bg-gray-800 p-3 rounded-md ui-panel-item ui-tooltip text-center">
+                         <p class="text-sm text-gray-400 truncate" title="${faction.name}">${faction.name}</p>
+                         <p class="text-lg font-bold font-orbitron ${loyaltyColor}">${Math.floor(finalLoyalty)}</p>
+                         <div class="tooltip-text">${tooltipHtml}</div>
+                     </div>`;
+             });
+             html += '</div>';
+             return html;
+        },
+
+        getExternalFactionsHtml(factions) {
+            let html = '<div class="grid grid-cols-2 md:grid-cols-4 gap-4">';
+            factions.forEach(faction => {
+                const relationship = Number(faction.relationship) || 0;
+                const relationshipColor = relationship > 25 ? 'text-green-400' : relationship < -25 ? 'text-red-400' : 'text-gray-300';
+                
+                let tooltipHtml = `<strong class='text-yellow-300'>${faction.name} 관계도</strong><p class='my-1 text-sm text-gray-400'>상태: ${faction.status || '알 수 없음'}</p><p class='my-1 text-sm text-cyan-400'>관계 이유: ${faction.reason || '알 수 없음'}</p><hr class='border-gray-600 my-1'><ul class='mt-1 text-sm space-y-1'>`;
+                tooltipHtml += `<li class='font-bold'>현재 관계도: <span class='float-right ${relationshipColor}'>${Math.floor(relationship)}</span></li></ul>`;
+
+                html += `
+                    <div class="bg-gray-800 p-3 rounded-md ui-panel-item ui-tooltip text-center">
+                        <p class="text-sm text-gray-400 truncate" title="${faction.name}">${faction.name}</p>
+                        <p class="text-lg font-bold font-orbitron ${relationshipColor}">${Math.floor(relationship)}</p>
+                        <div class="tooltip-text">${tooltipHtml}</div>
+                    </div>`;
+            });
+            html += '</div>';
+            return html;
+        },
+
+        getLeaderTraitsHtml(traits) {
+            let html = '<div class="flex flex-wrap gap-2">';
+            traits.forEach(trait => {
+                if (!trait || !trait.name) return;
+                let tooltipText = `<strong class='text-yellow-300'>${trait.name}</strong><p class='my-1 text-gray-400'>${trait.description}</p>`;
+                if (trait.effects && Object.keys(trait.effects).length > 0) {
+                    let effectsHtml = '<ul class="mt-2 text-sm space-y-1">';
+                    Object.entries(trait.effects).forEach(([stat, value]) => {
+                        const baseStat = stat.replace('_bonus', '').replace('_penalty', '');
+                        const statLabel = STAT_TRANSLATIONS[baseStat] || baseStat;
+                        const color = value >= 0 ? 'text-green-400' : 'text-red-400';
+                        const sign = value >= 0 ? '+' : '';
+                        effectsHtml += `<li><span class="${color}">${statLabel}:</span> <span class="float-right ${color}">${sign}${value}</span></li>`;
+                    });
+                    effectsHtml += '</ul>';
+                    tooltipText += effectsHtml;
+                }
+                html += `<div class="ui-tooltip bg-gray-800 px-3 py-1 rounded-md text-sm cursor-help">
+                    ${trait.name}<div class="tooltip-text">${tooltipText}</div></div>`;
+            });
+            html += '</div>';
+            return html;
+        },
+
+        getNationalSpiritsHtml(spiritIds) {
+            let html = '<div class="flex flex-wrap gap-2">';
+            spiritIds.forEach(spiritId => {
+                const spirit = NATIONAL_SPIRITS[spiritId];
+                if (!spirit) return;
+                let tooltipText = `<strong class='text-yellow-300'>${spirit.name}</strong><p class='my-1 text-gray-400'>${spirit.description}</p>`;
+                tooltipText += (spirit.effects.positive || []).map(e => `<span class='text-green-500'>+ ${e}</span>`).join('<br>');
+                tooltipText += '<br>' + (spirit.effects.negative || []).map(e => `<span class='text-red-500'>- ${e}</span>`).join('<br>');
+                html += `<div class="ui-tooltip bg-gray-800 px-3 py-1 rounded-md text-sm cursor-help">
+                    ${spirit.name}<div class="tooltip-text">${tooltipText}</div></div>`;
+            });
+            html += '</div>';
+            return html;
+        },
+
+        createPanelItem(label, value, valueColor, tooltipHtml) {
+            if (tooltipHtml) {
+                return `
+                    <div class="bg-gray-900 p-3 rounded-md ui-panel-item ui-tooltip">
+                        <p class="text-sm text-gray-400">${label}</p>
+                        <p class="text-lg font-bold font-orbitron ${valueColor}">${value}</p>
+                        <div class="tooltip-text">${tooltipHtml}</div>
+                    </div>`;
+            } else {
+                return `<div class="bg-gray-900 p-3 rounded-md ui-panel-item"><p class="text-sm text-gray-400">${label}</p><p class="text-lg font-bold font-orbitron ${valueColor}">${value}</p></div>`;
+            }
+        },
+        renderChoices() {
+            const promptEl = document.getElementById('choices-prompt');
+            const listEl = document.getElementById('choices-list');
+            const event = Events[game.state.world.currentEvent];
+            promptEl.textContent = event?.prompt || "결정을 내리십시오.";
+            listEl.innerHTML = '';
+            if(!event || !event.choices) return;
+            
+            const allChoices = [...event.choices]; // Removed intelligence report from here
+
+            allChoices.forEach(choice => {
+                if (!choice) return;
+                const button = document.createElement('button');
+                button.className = "w-full text-left p-4 rounded-lg choice-button";
+                let buttonText = choice.text;
+                if (choice.advisorName) {
+                    buttonText = `<span class="text-yellow-400">[${choice.advisorName}의 제안]</span> ${choice.text}`;
+                }
+                button.innerHTML = `<p class="font-bold text-lg">${buttonText}</p><p class="text-sm text-gray-400">${choice.description}</p>`;
+                button.onclick = () => game.update(choice);
+                listEl.appendChild(button);
+            });
+        }
+    }
+};
+
+// --- DYNAMIC/STATIC GAME DATA ---
+const INTELLIGENCE_ACTIONS = {
+    request_report: {
+        id: 'request_report',
+        name: '특정 대상 보고 요청',
+        description: '특정 인물, 조직, 또는 사건에 대한 상세한 첩보 보고서를 받습니다.',
+        cost: 25,
+        requiresInput: true,
+        inputTitle: '첩보 활동 지시',
+        inputPrompt: '첩보 활동 대상을 입력하십시오 (예: 카르타고 해군, 한니발 바르카):',
+        execute: async (state, target) => {
+            if (!target || !target.trim()) return;
+            const factionInfo = (state.factions || []).map(f => `${f.name}(${f.status})`).join(', ');
+            const response = await GEMINI.callGeminiApi("You are a master spy. Provide a concise, insightful intelligence report on the requested target.", `To the Sovereign: Urgent intelligence report regarding "${target}", based on the current world state: Year ${new Date(state.world.date).getFullYear()}, Factions: ${factionInfo}.`);
+            if (!response) {
+                openReportModal(`첩보 보고 실패`, `"${target}"에 대한 정보를 얻는 데 실패했습니다.`);
+                return;
+            }
+            openReportModal(`첩보 보고: ${target}`, response.replace(/\n/g, '<br>'));
+        }
+    },
+};
+
+let Scenarios = {};
+let Events = {};
+let Choices = {};
+
+// --- UI & GAME FLOW FUNCTIONS ---
+function showInfoModal(title, message) { openReportModal(title, message); }
+function openApiSettingsModal() {
+    document.getElementById('modal-api-key-input').value = localStorage.getItem('geminiApiKey') || '';
+    document.getElementById('image-api-toggle').checked = localStorage.getItem('useCustomImageApi') === 'true';
+    document.getElementById('api-settings-modal').classList.remove('hidden');
+}
+function closeApiSettingsModal() { document.getElementById('api-settings-modal').classList.add('hidden'); }
+function saveApiSettings() {
+    const apiKey = document.getElementById('modal-api-key-input').value.trim();
+    userApiKey = apiKey;
+    localStorage.setItem('geminiApiKey', userApiKey);
+    useCustomImageApi = document.getElementById('image-api-toggle').checked;
+    localStorage.setItem('useCustomImageApi', useCustomImageApi.toString());
+    showInfoModal('설정 저장', '설정이 저장되었습니다.');
+    closeApiSettingsModal();
+}
+let onInputModalSubmit = null;
+function openInputModal(title, promptText, callback) {
+    document.getElementById('input-modal-title').textContent = title;
+    document.getElementById('input-modal-prompt').textContent = promptText;
+    document.getElementById('input-modal-textarea').value = '';
+    document.getElementById('input-modal-textarea').placeholder = promptText;
+    onInputModalSubmit = callback;
+    document.getElementById('input-modal').classList.remove('hidden');
+    document.getElementById('input-modal-textarea').focus();
+}
+function closeInputModal() { document.getElementById('input-modal').classList.add('hidden'); onInputModalSubmit = null; }
+function submitInputModal() {
+    const value = document.getElementById('input-modal-textarea').value;
+    if (onInputModalSubmit) { onInputModalSubmit(value); }
+    closeInputModal();
+}
+
+async function isActionAbsurd(userInput, state) {
+    const systemPrompt = "You are a historical anachronism detector. Your only job is to determine if a command is impossible because it contains technology or concepts from the distant future. For example, 'Build a smartphone factory' in 1592 is anachronistic. 'Appoint my horse as a consul' is strange, but not anachronistic. Respond with only one word: `PLAUSIBLE` if the action is historically possible (even if bizarre), or `ABSURD` if it is a clear anachronism from the future.";
+    const userPrompt = `Context: The year is ${formatHistoricalDate(state.world.date)} for the nation of ${state.playerNation.name}. Command: "${userInput}"`;
+    
+    try {
+        const response = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        return response.trim().toUpperCase() === 'ABSURD';
+    } catch (e) {
+        console.error("Absurdity check failed:", e);
+        return false; // Fail safe to plausible
+    }
+}
+
+async function handleAbsurdAction() {
+    game.state.absurdityCounter++;
+    const counter = game.state.absurdityCounter;
+    let title, content;
+    if (counter === 1) {
+        title = "어리둥절한 신하들";
+        content = "당신의 엉뚱한 명령에 신하들이 잠시 서로를 쳐다보며 어리둥절했지만, 이내 못 들은 척하며 넘깁니다.";
+    } else if (counter === 2) {
+        title = "수군거리는 궁정";
+        content = "또다시 이상한 말씀을 하시는군요. 몇몇 조언자들이 당신이 없는 곳에서 당신의 정신 건강에 대한 우려를 표하기 시작했습니다.";
+    } else {
+        const isAncient = (new Date(game.state.world.date).getFullYear() < 1600);
+        title = "지도자에 대한 의심";
+        content = isAncient ? "당신의 기행이 궁궐 밖으로 새어나가기 시작했습니다. 백성들은 당신이 귀신에 씌었거나, 정신이 나갔다고 수군거립니다." : "당신의 이해할 수 없는 발언들이 언론에 오르내립니다. 국민들은 지도자의 정신 상태에 대해 심각한 의문을 제기하고 있습니다.";
+        const penalty = -(counter - 2) * 2;
+        content += `<br><br><span class='text-red-400'>소문으로 인해 국가 안정도와 지지도가 ${penalty}% 감소합니다.</span>`;
+        ['stability', 'approval'].forEach(stat => {
+            let modifiers = game.state.playerNation.modifiers[stat];
+            if (!modifiers) { game.state.playerNation.modifiers[stat] = []; modifiers = game.state.playerNation.modifiers[stat]; }
+            let existingMod = modifiers.find(m => m.name === "군주의 기행");
+            if (existingMod) { existingMod.value = penalty * (counter-1); } else { modifiers.push({ name: "군주의 기행", value: penalty }); }
+        });
+    }
+    openReportModal(title, content);
+    game.Renderer.renderUIPanel();
+    document.getElementById('custom-action-input').value = "";
+}
+async function handleCustomAction() {
+    const userInput = document.getElementById('custom-action-input').value.trim();
+    if (!userInput) { showInfoModal("입력 오류", "지시할 내용을 입력하십시오."); return; }
+    if (await isActionAbsurd(userInput, game.state)) { await handleAbsurdAction(); return; }
+
+    const timeToAdvance = estimateTimeForAction(userInput);
+    advanceTimeAndAnimate(timeToAdvance, async () => {
+        const currentState = game.state;
+        await game.updateTendencies(userInput);
+        const systemPrompt = "You are a master storyteller for 'The Sovereign's Chronicle'. The player has issued a direct, custom command instead of choosing a pre-defined option. Generate the next event IN KOREAN based on this command. Follow these rules strictly:\n" + "1.  **Interpret the Command:** Analyze the player's command and create a logical, realistic outcome. If the command is impossible or unwise, the narrative should reflect the consequences or difficulties.\n" + "2.  **Acknowledge Context:** Your narrative should reflect the current political situation defined by the key factions.\n" + "3.  **Response Format:** Respond with ONLY the following sections, separated by '---':\n" + "    NARRATIVE: [A compelling story describing the outcome of the player's command.]\n" + "    ---\n" + "    PROMPT: [A new question for the player arising from the new situation.]\n" + "    ---\n" + "    CHOICE 1: [Text for the first new choice.]\n" + "    ---\n" + "    CHOICE 2: [Text for the second new choice.]\n" + "    ---\n" + "    CHOICE 3: [Text for a third new choice (optional).]\n" + "    ---\n" + "    EFFECTS: [A valid JSON array of game state changes.]";
+        const factionInfo = (currentState.factions || []).map(f => `${f.name}(${f.status})`).join(', ');
+        const userPrompt = `CURRENT SITUATION: The year is ${new Date(currentState.world.date).getFullYear()} for ${currentState.playerNation.name}. The current event is: "${Events[currentState.world.currentEvent].narrative}"\n` + `KEY FACTIONS IN THE REGION: ${factionInfo}\n` + `PLAYER'S DIRECT COMMAND: "${userInput}"\n` + 'Generate the next event that results from this command.';
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) { showInfoModal("명령 해석 실패", "AI가 당신의 지시를 해석하는 데 실패했습니다."); return; }
+        const newEvent = game.parseNarrativeResponse(responseText);
+        if (!newEvent) { showInfoModal("진행 불가", "AI의 응답 형식이 올바르지 않아 이야기를 계속할 수 없습니다."); return; }
+        Events[newEvent.id] = newEvent;
+        currentState.world.currentEvent = newEvent.id;
+        document.getElementById('custom-action-input').value = "";
+        game.checkNationalSpiritFormation();
+        await game.Renderer.renderAll();
+    });
+}
+async function playDialogueAudio(element) {
+    const textToRead = element.parentElement.querySelector('.dialogue-text').innerText;
+    const audioUrl = await GEMINI.callTtsApi(textToRead);
+    if (audioUrl) {
+        const audioPlayer = document.getElementById('tts-audio-player');
+        audioPlayer.src = audioUrl;
+        audioPlayer.play();
+        audioPlayer.onended = () => URL.revokeObjectURL(audioUrl);
+    }
+}
+async function playNarrativeAudio(buttonEl) {
+    const narrativeEl = document.getElementById('narrative-text');
+    if (!narrativeEl || buttonEl.disabled) return;
+    const originalContent = buttonEl.innerHTML;
+    buttonEl.innerHTML = `<svg class="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+    buttonEl.disabled = true;
+    const textToRead = narrativeEl.innerText;
+    const audioUrl = await GEMINI.callTtsApi(textToRead);
+    if (audioUrl) {
+        const audioPlayer = document.getElementById('tts-audio-player');
+        audioPlayer.src = audioUrl;
+        audioPlayer.play();
+        audioPlayer.onended = () => { URL.revokeObjectURL(audioUrl); buttonEl.innerHTML = originalContent; buttonEl.disabled = false; };
+        audioPlayer.onerror = () => { showInfoModal("오디오 재생 오류", "오디오 재생 중 오류가 발생했습니다."); buttonEl.innerHTML = originalContent; buttonEl.disabled = false; }
+    } else {
+        buttonEl.innerHTML = originalContent;
+        buttonEl.disabled = false;
+    }
+}
+function startGame(scenarioId) {
+    if(!scenarioId) { showInfoModal("오류", "시나리오가 선택되지 않았습니다."); return; }
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-content').classList.remove('hidden');
+    document.getElementById('pre-game-header-buttons').classList.add('hidden');
+    document.getElementById('in-game-header-buttons').classList.remove('hidden');
+    game.init(scenarioId);
+}
+function updateBriefing(scenarioId, briefing) {
+    document.getElementById('briefing-content').innerHTML = `<div id="briefing-metadata"><p><strong class="font-bold">TO:</strong> ${briefing.to}</p><p><strong class="font-bold">FROM:</strong> ${briefing.from}</p><p><strong class="font-bold">DATE:</strong> ${briefing.date}</p></div><hr id="briefing-hr" class="my-4 border-gray-300 block"><p id="briefing-body" class="text-justify leading-relaxed">${(briefing.content || "").replace(/\n/g, '<br>')}</p>`;
+    document.getElementById('briefing-title').textContent = (briefing.title || "CLASSIFIED").toUpperCase();
+    const startButton = document.getElementById('start-button');
+    startButton.dataset.scenarioId = scenarioId;
+    startButton.disabled = false;
+    startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+    startButton.classList.add('hover:bg-blue-900', 'hover:border-blue-900');
+}
+
+function showBriefingLoading(message) {
+    document.getElementById('briefing-metadata').innerHTML = '';
+    document.getElementById('briefing-hr').classList.add('hidden');
+    document.getElementById('briefing-body').innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8">
+            <div class="spinner"></div>
+            <p class="mt-4 text-gray-600">${message}</p>
+        </div>`;
+    const startButton = document.getElementById('start-button');
+    startButton.disabled = true;
+    startButton.classList.add('opacity-50', 'cursor-not-allowed');
+}
+
+
+async function generateRandomScenario() {
+    const randomPrompts = [ "1066년 노르만 정복 직전의 잉글랜드", "기원전 44년, 카이사르 암살 직후의 로마", "1868년 일본 메이지 유신", "1453년 콘스탄티노플 공방전", "1917년 러시아 10월 혁명 직전", "BC 221년 진시황의 중국 통일", "1776년 미국 독립 전쟁" ];
+    const randomPrompt = randomPrompts[Math.floor(Math.random() * randomPrompts.length)];
+    await generateCustomScenario(randomPrompt);
+}
+async function generateCustomScenario(promptOverride = null) {
+    const userInput = promptOverride || document.getElementById('era-input').value;
+    if (!userInput.trim()) { showInfoModal("입력 오류", "시대를 입력해주세요."); return; }
+    if(!promptOverride) { hideEraModal(); }
+    
+    showBriefingLoading("AI가 새로운 역사의 장을 만들고 있습니다...");
+
+    const systemPrompt = `You are a historical game designer. Create a detailed starting scenario in KOREAN based on the user's request.
+**RULES:**
+1.  **Language:** Respond entirely in KOREAN.
+2.  **Historical Plausibility:** Provide realistic starting values for all game parameters. **Crucially, the 'techLevel' MUST be appropriate for the requested era.** (e.g., year 1868 should be around level 4-5, not 1).
+3.  **JSON Format:** ALL JSON data MUST be valid.
+4.  **Provide Modifiers:** You MUST include at least one or two starting modifiers in the 'MODIFIERS' JSON array to reflect unique historical circumstances.
+5.  **Strict Response Format:** Use '---' as a separator. The 'FACTIONS' JSON must have 'relationship' and 'reason'. 'INTERNAL_FACTIONS' must have 'desire'. 'LEADER_TRAITS' must be an array of objects.
+
+**RESPONSE FORMAT:**
+SCENARIO_NAME: [Plausible Nation Name]
+---
+DATE: [Historical Start Date]
+---
+REPORT: [Situation report]
+---
+STATS: {"stability": 75, "politicalPower": 100, "powerInfluence": 75, "treasury": 1000, "income": {"treasury": 10, "manpower": 5, "resources": 1}, ... "techLevel": 4}
+---
+MODIFIERS: [{"stat": "stability", "name": "...", "value": -15}]
+---
+FACTIONS: [{"id": "uk", "name": "영국", "relationship": -10, "status": "경계", "reason": "최근 국경 분쟁"}]
+---
+INTERNAL_FACTIONS: [{"id": "nobility", "name": "귀족", "loyalty": 40, "influence": 60, "description": "...", "desire": "봉건 질서 유지"}]
+---
+LEADER_TRAITS: [{"id": "charismatic", "name": "카리스마", "description": "...", "effects": {"approval_bonus": 10}}]
+---
+ADVISOR_MILITARY: [Name, Title, Personality, Description]
+---
+ADVISOR_SCIENCE: [Name, Title, Personality, Description]
+---
+ADVISOR_TRADE: [Name, Title, Personality, Description]
+---
+ADVISOR_DIPLOMACY: [Name, Title, Personality, Description]
+---
+ADVISOR_SATISFACTION: [Name, Title, Personality, Description]`;
+    const userPrompt = `Generate a scenario for this theme: "${userInput}"`;
+    try {
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) throw new Error("AI response was empty.");
+        const scenarioData = {};
+        responseText.split('---').forEach(section => {
+            const [key, ...valueParts] = section.trim().split(':');
+            const value = valueParts.join(':').trim();
+            if (key && value) { scenarioData[key.trim()] = value; }
+        });
+        const playerNationName = scenarioData.SCENARIO_NAME || userInput;
+        const briefingDate = scenarioData.DATE || '알 수 없음';
+        const briefingContent = scenarioData.REPORT;
+        if (!briefingContent) throw new Error("AI response did not contain a 'REPORT:' section.");
+        
+        let stats;
+        try { stats = JSON.parse(scenarioData.STATS || '{}'); } catch(e){ stats = {}; console.error("Error parsing STATS JSON", e); }
+        
+        let modifiersRaw;
+        try { modifiersRaw = JSON.parse(scenarioData.MODIFIERS || '[]'); } catch(e){ modifiersRaw = []; console.error("Error parsing MODIFIERS JSON", e); }
+        
+        let factions;
+        try { factions = JSON.parse(scenarioData.FACTIONS || '[]').map(f => ({...f, relationship: Number(f.relationship) || 0 })); } catch(e){ factions = []; console.error("Error parsing FACTIONS JSON", e); }
+
+        let internalFactions;
+        try { internalFactions = JSON.parse(scenarioData.INTERNAL_FACTIONS || '[]'); } catch(e){ internalFactions = []; console.error("Error parsing INTERNAL_FACTIONS JSON", e); }
+        
+        let leaderTraits;
+        try { leaderTraits = JSON.parse(scenarioData.LEADER_TRAITS || '[]'); } catch(e){ leaderTraits = []; console.error("Error parsing LEADER_TRAITS JSON", e); }
+
+        const modifiers = {};
+        modifiersRaw.forEach(mod => {
+            if (!modifiers[mod.stat]) { modifiers[mod.stat] = []; }
+            modifiers[mod.stat].push({ name: mod.name, value: mod.value });
+        });
+        
+        const advisors = [];
+        const advisorRoles = { 'ADVISOR_MILITARY': 'military', 'ADVISOR_SCIENCE': 'science', 'ADVISOR_TRADE': 'trade', 'ADVISOR_DIPLOMACY': 'diplomacy', 'ADVISOR_SATISFACTION': 'satisfaction' };
+        Object.entries(advisorRoles).forEach(([key, role]) => {
+            const content = scenarioData[key];
+            if (content) {
+                const details = content.split(',');
+                if (details.length >= 4) { advisors.push({ role, name: details[0].trim(), title: details[1].trim(), personality: details[2].trim(), description: details.slice(3).join(',').trim() }); }
+            }
+        });
+        const scenarioId = 'custom_' + Date.now();
+        const isoDate = parseKoreanDateToISO(briefingDate);
+        Scenarios[scenarioId] = {
+            briefing: { to: "지도자 (Player)", from: "정보국", date: briefingDate, title: playerNationName, content: briefingContent },
+            initialState: {
+                playerNation: { 
+                    name: playerNationName, 
+                    stability: Number(stats.stability) || 75, 
+                    politicalPower: Number(stats.politicalPower) || 100, 
+                    powerInfluence: Number(stats.powerInfluence) || 75,
+                    manpower: Number(stats.manpower) || 500000, 
+                    resources: Number(stats.resources) || 100, 
+                    treasury: Number(stats.treasury) || 1000, 
+                    approval: Number(stats.approval) || 50, 
+                    techLevel: Number(stats.techLevel) || 1, 
+                    income: stats.income || { treasury: 10, manpower: 5, resources: 1 },
+                    modifiers: modifiers 
+                },
+                world: { date: isoDate, currentEvent: 'custom_event_start' },
+                advisors, factions, internalFactions, leaderTraits, policies: []
+            },
+            initialEvent: { id: 'custom_event_start', narrative: briefingContent, prompt: "이 중대한 순간에, 어떤 첫걸음을 내딛으시겠습니까?", choices: [ { id: `custom_1`, text: "상황을 안정시키고 내부를 다진다.", description: "혼란을 수습하고 국력을 비축합니다." }, { id: `custom_2`, text: "과감하게 행동하여 기회를 잡는다.", description: "위기를 기회로 삼아 공세적으로 나섭니다." }, { id: `custom_3`, text: "주변 세력과 외교적 해법을 모색한다.", description: "전쟁보다는 대화를 통해 문제를 해결합니다." } ] }
+        };
+        updateBriefing(scenarioId, Scenarios[scenarioId].briefing);
+    } catch (e) {
+        console.error("Error during custom scenario generation:", e);
+        showInfoModal("생성 오류", "시나리오 생성 중 오류가 발생했습니다. AI 응답 형식이 잘못되었을 수 있습니다. 다시 시도해 주세요.");
+    }
+}
+function showEraModal() { document.getElementById('era-choice-modal').classList.remove('hidden'); }
+function hideEraModal() { document.getElementById('era-choice-modal').classList.add('hidden'); }
+function openReportModal(title, content) {
+    document.getElementById('report-title').innerHTML = title;
+    document.getElementById('report-content').innerHTML = content;
+    document.getElementById('report-modal').classList.remove('hidden');
+}
+function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+function openImageModal(src) { document.getElementById('modal-image').src = src; document.getElementById('image-modal').classList.remove('hidden'); }
+function closeImageModal() { document.getElementById('image-modal').classList.add('hidden'); }
+async function regenerateCurrentImage() {
+    game.isRegenerating = true;
+    const imageContainer = document.getElementById('event-image-container');
+    imageContainer.innerHTML = `<div class="text-center text-gray-500"><div class="spinner" style="margin: auto;"></div><p class="mt-2 text-sm">✨ 새로운 장면 생성 중...</p></div>`;
+    await game.Renderer.generateAndDisplayImage();
+}
+async function openAdvisorSelector() {
+    if (!game.state.advisors || game.state.advisors.length === 0) { showInfoModal("오류", "현재 시나리오에 자문회가 없습니다."); return; }
+    document.getElementById('advisor-selector-modal').classList.remove('hidden');
+    const portraitsContainer = document.getElementById('advisor-portraits-container');
+    portraitsContainer.innerHTML = '';
+    game.selectedAdvisors.clear();
+    const roleNames = { military: '군사', science: '과학', trade: '무역', diplomacy: '외교', satisfaction: '민심'};
+    game.state.advisors.forEach(advisor => {
+        const cell = document.createElement('div');
+        cell.className = 'text-center';
+        const nameLabel = document.createElement('p');
+        nameLabel.className = 'text-sm font-bold mb-1 truncate text-white';
+        nameLabel.textContent = advisor.name;
+        nameLabel.title = advisor.name;
+        const portraitDiv = document.createElement('div');
+        portraitDiv.id = `portrait-${advisor.role}`;
+        portraitDiv.className = 'advisor-portrait bg-gray-900 rounded flex items-center justify-center mx-auto advisor-portrait-cell';
+        if (advisor.imageUrl) {
+            portraitDiv.innerHTML = `<img src="${advisor.imageUrl}" class="w-full h-full object-cover rounded">`;
+        } else {
+            portraitDiv.innerHTML = `<div class="spinner !w-8 !h-8"></div>`;
+            (async () => {
+                const nationName = game.state.playerNation.name;
+                const keywords = HISTORICAL_KEYWORDS[nationName] || HISTORICAL_KEYWORDS['default'];
+                const prompt = `Portrait of a ${advisor.description}, from ${nationName}. Style: realistic historical painting. MUST include: ${keywords.positive}. MUST AVOID: ${keywords.negative}.`;
+                const imageUrl = await GEMINI.generateImage(prompt);
+                advisor.imageUrl = imageUrl;
+                portraitDiv.innerHTML = imageUrl ? `<img src="${imageUrl}" class="w-full h-full object-cover rounded">` : 'X';
+            })();
+        }
+        portraitDiv.onclick = () => toggleAdvisorSelection(advisor.role);
+        const roleLabel = document.createElement('button');
+        roleLabel.className = 'mt-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-md shadow-md';
+        roleLabel.textContent = roleNames[advisor.role];
+        cell.appendChild(nameLabel);
+        cell.appendChild(portraitDiv);
+        cell.appendChild(roleLabel);
+        portraitsContainer.appendChild(cell);
+    });
+}
+function closeAdvisorSelector() { document.getElementById('advisor-selector-modal').classList.add('hidden'); }
+function toggleAdvisorSelection(role) {
+    const portrait = document.getElementById(`portrait-${role}`);
+    if (game.selectedAdvisors.has(role)) {
+        game.selectedAdvisors.delete(role);
+        portrait.classList.remove('selected');
+    } else {
+        game.selectedAdvisors.add(role);
+        portrait.classList.add('selected');
+    }
+}
+async function startAdvisorDiscussion() {
+    if (game.selectedAdvisors.size === 0) { showInfoModal("선택 필요", "토론에 참여할 조언자를 한 명 이상 선택하십시오."); return; }
+    closeAdvisorSelector();
+    await getGroupAdvice();
+}
+async function getGroupAdvice(isFollowUp = false, userInput = "") {
+    const discussionContainer = document.getElementById('advisor-discussion-container');
+    const discussionLog = document.getElementById('advisor-discussion-log');
+    discussionContainer.classList.remove('hidden');
+    let currentHistoryHTML = "";
+    if (!isFollowUp) {
+        discussionLog.innerHTML = `<div class="p-2 flex justify-center"><div class="spinner !w-5 !h-5"></div></div>`;
+        game.newProposals = [];
+        game.advisorConversationTextHistory = ""; 
+    } else {
+        currentHistoryHTML = discussionLog.innerHTML;
+        discussionLog.innerHTML += `<div class="p-2 flex justify-center"><div class="spinner !w-5 !h-5"></div></div>`;
+    }
+    const selectedAdvisors = game.state.advisors.filter(a => game.selectedAdvisors.has(a.role));
+    const currentEvent = Events[game.state.world.currentEvent];
+    const advisorList = selectedAdvisors.map(a => `- ${a.name} (${a.title}, ${a.personality})`).join('\n');
+    const systemPrompt = `You are an AI moderator for a council of historical advisors. Your task is to simulate a dynamic, realistic, and sometimes contentious discussion. **Core Rules:** 1. **Generate Conflict:** If advisors with opposing personalities are present, they MUST argue. 2. **Actionable Proposals:** If an advisor makes a clear suggestion, prefix it with "PROPOSAL:". 3. **Conversational Flow:** Keep responses brief and back-and-forth. 4. **In-Character:** All dialogue must reflect the advisor's personality. 5. **Language:** Respond in Korean. Each line must start with the speaker's name in bold.`;
+    let userPrompt = `Current Situation: "${currentEvent.narrative}"\n`;
+    if (game.state.nationalSpirits.length > 0) {
+        const spiritNames = game.state.nationalSpirits.map(id => NATIONAL_SPIRITS[id].name).join(', ');
+        userPrompt += `Our nation's Spirits: [${spiritNames}]. This should influence opinions.\n\n`;
+    }
+    userPrompt += `Selected Advisors:\n${advisorList}\n\n`;
+    if(isFollowUp && game.advisorConversationTextHistory) {
+         userPrompt += `Conversation History:\n${game.advisorConversationTextHistory}\n\n`;
+    }
+    if(isFollowUp) {
+        userPrompt += `My new question is: "${userInput}"\n\nPlease have them discuss this question.`;
+    } else {
+        userPrompt += `Please have them start a discussion.`;
+    }
+    const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+    if (isFollowUp) { discussionLog.innerHTML = currentHistoryHTML; } else { discussionLog.innerHTML = ""; }
+    if (responseText) {
+        const entries = responseText.split('\n').filter(line => line.trim() !== '');
+        let newHtml = "";
+        let newTextForHistory = "";
+        const speakerIcon = `<span onclick="playDialogueAudio(this)" class="speaker-button" title="대사 듣기"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg></span>`;
+        
+        entries.forEach(entry => {
+            let speaker = "시스템";
+            let dialogue = entry;
+            
+            const proposalKeyword = 'PROPOSAL:';
+            const fullEntryUpper = entry.toUpperCase();
+            const proposalIndex = fullEntryUpper.indexOf(proposalKeyword);
+
+            const parts = entry.split(':');
+            if (parts.length > 1) {
+                speaker = parts[0].trim().replace(/\*/g, '');
+                dialogue = parts.slice(1).join(':').trim();
+            }
+
+            if (proposalIndex !== -1) {
+                let remainingText = entry.substring(proposalIndex + proposalKeyword.length).trim();
+                remainingText = remainingText.replace(/^\*+/, '').replace(/\*+$/, '');
+
+                const speakerSplit = remainingText.split(':');
+                let speakerForProposal = speaker;
+                let proposalTextForChoice = "";
+
+                if (speakerSplit.length > 1 && selectedAdvisors.some(a => a.name === speakerSplit[0].trim().replace(/\*/g, ''))) {
+                    speakerForProposal = speakerSplit[0].trim().replace(/\*/g, '');
+                    proposalTextForChoice = speakerSplit.slice(1).join(':').trim();
+                } else {
+                    proposalTextForChoice = remainingText;
+                }
+
+                if (proposalTextForChoice) {
+                     if (!game.newProposals.some(p => p.text === proposalTextForChoice)) {
+                        game.newProposals.push({ advisorName: speakerForProposal, text: proposalTextForChoice });
+                    }
+                    const styledProposal = `<span class="text-yellow-300 font-bold underline decoration-wavy" title="이 제안이 선택지에 추가되었습니다.">${proposalTextForChoice}</span>`;
+                    dialogue = dialogue.replace(new RegExp(proposalTextForChoice.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i'), styledProposal);
+                }
+            }
+            
+            newHtml += `<div class="dialogue-entry"><strong>${speaker}:</strong> <span class="dialogue-text">${dialogue}</span>${speakerIcon}</div>`;
+            newTextForHistory += `${speaker}: ${dialogue.replace(/<[^>]*>/g, '')}\n`;
+        });
+
+        discussionLog.innerHTML += newHtml;
+        game.advisorConversationTextHistory = (game.advisorConversationTextHistory || "") + newTextForHistory;
+        discussionLog.scrollTop = discussionLog.scrollHeight;
+    } else {
+         discussionLog.innerHTML += `<p>조언자들이 의견을 내지 못했습니다.</p>`;
+    }
+    updateChoicesWithProposals();
+}
+async function continueMainScreenDiscussion() {
+    const userInput = document.getElementById('advisor-input').value.trim();
+    if (!userInput) return;
+    if (game.selectedAdvisors.size === 0) { showInfoModal("선택 필요", "자문회 버튼을 통해 토론을 시작할 조언자들을 먼저 선택해주십시오."); return; }
+    const discussionLog = document.getElementById('advisor-discussion-log');
+    discussionLog.innerHTML += `<div class="dialogue-entry text-yellow-300"><strong>당신:</strong> ${userInput}</div>`;
+    game.advisorConversationTextHistory += `당신: ${userInput}\n`;
+    document.getElementById('advisor-input').value = "";
+    await getGroupAdvice(true, userInput);
+}
+function updateChoicesWithProposals() {
+    const currentEvent = Events[game.state.world.currentEvent];
+    if (!currentEvent) return;
+    if (!currentEvent.baseChoices) { currentEvent.baseChoices = [...currentEvent.choices]; }
+    let newChoices = [...currentEvent.baseChoices];
+    if (game.newProposals.length > 0) {
+        game.newProposals.forEach(proposal => {
+            const choiceId = `advisor_prop_${Date.now()}_${Math.random()}`;
+            const newChoice = { id: choiceId, text: proposal.text, description: `${proposal.advisorName} 조언자의 제안입니다.`, advisorName: proposal.advisorName, execute: game.handleStandardChoice.bind(game) };
+            if (!newChoices.some(c => c.text === newChoice.text)) {
+                 newChoices.push(newChoice);
+                 Choices[choiceId] = newChoice;
+            }
+        });
+    }
+    currentEvent.choices = newChoices;
+    game.Renderer.renderChoices();
+}
+function openIntelligenceModal() {
+    const actionsList = document.getElementById('intelligence-actions-list');
+    actionsList.innerHTML = '';
+    const currentPower = game.state.playerNation.politicalPower;
+
+    if (Object.keys(INTELLIGENCE_ACTIONS).length === 0) {
+        actionsList.innerHTML = `<p class="text-gray-400">현재 수행할 수 있는 첩보 활동이 없습니다.</p>`;
+    } else {
+        Object.values(INTELLIGENCE_ACTIONS).forEach(action => {
+            const canAfford = currentPower >= action.cost;
+            const actionDiv = document.createElement('div');
+            actionDiv.className = `bg-gray-800 p-4 rounded-lg border-l-4 ${canAfford ? 'border-blue-500' : 'border-red-500'}`;
+            
+            actionDiv.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h4 class="font-bold text-lg">${action.name}</h4>
+                        <p class="text-sm text-gray-400 mt-1">${action.description}</p>
+                    </div>
+                    <div class="text-right ml-4 flex-shrink-0">
+                        <p class="font-bold text-lg ${canAfford ? 'text-yellow-400' : 'text-red-500'}">${action.cost} 권력</p>
+                        <button class="mt-2 px-3 py-1 text-sm rounded-md ${canAfford ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-600 cursor-not-allowed'}" 
+                                onclick="${canAfford ? `performIntelligenceAction('${action.id}')` : ''}" ${!canAfford ? 'disabled' : ''}>
+                            실행
+                        </button>
+                    </div>
+                </div>`;
+            actionsList.appendChild(actionDiv);
+        });
+    }
+    document.getElementById('intelligence-modal').classList.remove('hidden');
+}
+
+function closeIntelligenceModal() { 
+    document.getElementById('intelligence-modal').classList.add('hidden'); 
+}
+
+function performIntelligenceAction(actionId) {
+    const action = INTELLIGENCE_ACTIONS[actionId];
+    if (!action) return;
+
+    if (game.state.playerNation.politicalPower >= action.cost) {
+        game.state.playerNation.politicalPower -= action.cost;
+        closeIntelligenceModal();
+
+        if (action.requiresInput) {
+            openInputModal(action.inputTitle, action.inputPrompt, (target) => {
+                action.execute(game.state, target);
+                game.Renderer.renderUIPanel(); // Re-render to show spent power
+            });
+        } else {
+            action.execute(game.state);
+            game.Renderer.renderUIPanel(); // Re-render to show spent power
+        }
+        showInfoModal("첩보 활동", `[${action.name}] 활동을 위해 권력 ${action.cost}을(를) 사용했습니다.`);
+    } else {
+        showInfoModal("권력 부족", "첩보 활동을 실행하기에 권력이 부족합니다.");
+    }
+}
+
+function toggleCollapsible(header) {
+    const content = header.nextElementSibling;
+    const arrow = header.querySelector('.arrow');
+    if (content.style.maxHeight) {
+        content.style.overflow = 'hidden';
+        content.style.maxHeight = null;
+        arrow.style.transform = 'rotate(0deg)';
+    } else {
+        content.style.maxHeight = content.scrollHeight + "px";
+        arrow.style.transform = 'rotate(180deg)';
+        setTimeout(() => { content.style.overflow = 'visible'; }, 300);
+    }
+}
+window.onload = () => {
+    document.getElementById('input-modal-cancel').onclick = closeInputModal;
+    document.getElementById('input-modal-submit').onclick = submitInputModal;
+    document.getElementById('input-modal-textarea').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInputModal(); }
+    });
+    document.getElementById('game-content').addEventListener('click', function(e) {
+        const header = e.target.closest('.collapsible-header');
+        if (header) { toggleCollapsible(header); }
+    });
+    let activeTooltip = null;
+    document.body.addEventListener('mouseover', (e) => {
+        const tooltipContainer = e.target.closest('.ui-tooltip');
+        if (tooltipContainer) {
+            const tooltipText = tooltipContainer.querySelector('.tooltip-text');
+            if (tooltipText && tooltipText !== activeTooltip) {
+                if(activeTooltip) { activeTooltip.style.visibility = 'hidden'; activeTooltip.style.opacity = '0'; }
+                activeTooltip = tooltipText;
+                tooltipText.style.visibility = 'visible';
+                tooltipText.style.opacity = '1';
+                const targetRect = tooltipContainer.getBoundingClientRect();
+                const tooltipRect = tooltipText.getBoundingClientRect();
+                let top = targetRect.top - tooltipRect.height - 8;
+                let left = targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2);
+                if (top < 0) { top = targetRect.bottom + 8; }
+                if (left < 0) left = 8;
+                if (left + tooltipRect.width > window.innerWidth) { left = window.innerWidth - tooltipRect.width - 8; }
+                tooltipText.style.top = `${top}px`;
+                tooltipText.style.left = `${left}px`;
+            }
+        }
+    });
+    document.body.addEventListener('mouseout', (e) => {
+        const tooltipContainer = e.target.closest('.ui-tooltip');
+         if (tooltipContainer) {
+             if(activeTooltip) { activeTooltip.style.visibility = 'hidden'; activeTooltip.style.opacity = '0'; activeTooltip = null; }
+         }
+    });
+    document.addEventListener('scroll', () => {
+        if (activeTooltip) { activeTooltip.style.visibility = 'hidden'; activeTooltip.style.opacity = '0'; activeTooltip = null; }
+    }, true);
+    const savedApiKey = localStorage.getItem('geminiApiKey');
+    if (savedApiKey) { userApiKey = savedApiKey; }
+    useCustomImageApi = localStorage.getItem('useCustomImageApi') === 'true';
+};
+</script>
+</body>
+</html>
+
