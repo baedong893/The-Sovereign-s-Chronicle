@@ -37,6 +37,10 @@
             background-color: #4b5563; /* gray-600 */
             border-color: #fbbf24; /* amber-300 */
         }
+        .choice-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
         .header-button {
             transition: all 0.2s ease-in-out;
         }
@@ -542,7 +546,8 @@ function advanceTimeAndAnimate(duration, onComplete) {
     
     const originalState = JSON.parse(JSON.stringify(game.state));
     const totalSecondsToAdd = (endDate - startDate) / 1000;
-    const totalDaysToAdd = totalSecondsToAdd / (24 * 60 * 60);
+    const totalHoursToAdd = totalSecondsToAdd / 3600;
+    const totalDaysToAdd = totalHoursToAdd / 24;
     const income = game.state.playerNation.income || { treasury: 10, manpower: 5, resources: 1 };
 
     const totalChanges = {
@@ -584,6 +589,27 @@ function advanceTimeAndAnimate(duration, onComplete) {
             game.state.factions.forEach(f => f.relationship = Math.max(-100, Math.min(100, f.relationship + (totalChanges.factions[f.id] || 0))));
             game.state.internalFactions.forEach(f => f.loyalty = Math.max(0, Math.min(100, f.loyalty + (totalChanges.internalFactions[f.id] || 0))));
 
+            // Final research update
+            if (game.state.research && game.state.research.currentProject) {
+                const hoursPassed = (endDate - startDate) / (1000 * 60 * 60);
+                game.state.research.timeElapsed += hoursPassed;
+                let progress = (game.state.research.timeElapsed / game.state.research.currentProject.totalTime) * 100;
+                game.state.research.progress = Math.min(progress, 100);
+
+                if (game.state.research.progress >= 100) {
+                    const completedProject = game.state.research.currentProject;
+                    openReportModal("연구 완료", `[${completedProject.name}] 연구가 완료되었습니다!`);
+                    
+                    if (completedProject.effects) {
+                        game.applyEffects(completedProject.effects); 
+                    }
+                    
+                    game.state.research.currentProject = null;
+                    game.state.research.progress = 0;
+                    game.state.research.timeElapsed = 0;
+                }
+            }
+
             game.Renderer.renderUIPanel();
             game.Renderer.renderCollapsiblePanels();
             if (onComplete) onComplete();
@@ -595,10 +621,20 @@ function advanceTimeAndAnimate(duration, onComplete) {
         dateEl.textContent = formatHistoricalDate(currentAnimDate.toISOString());
         timeEl.textContent = currentAnimDate.toTimeString().split(' ')[0];
 
+        // Update passive income
         game.state.playerNation.treasury = originalState.playerNation.treasury + totalChanges.treasury * proportion;
         game.state.playerNation.manpower = originalState.playerNation.manpower + totalChanges.manpower * proportion;
         game.state.playerNation.resources = originalState.playerNation.resources + totalChanges.resources * proportion;
 
+        // Update research progress
+        if (game.state.research && game.state.research.currentProject) {
+            const hoursPassedThisProportion = totalHoursToAdd * proportion;
+            game.state.research.timeElapsed = originalState.research.timeElapsed + hoursPassedThisProportion;
+            let progress = (game.state.research.timeElapsed / game.state.research.currentProject.totalTime) * 100;
+            game.state.research.progress = Math.min(progress, 100);
+        }
+
+        // Update faction drift
         game.state.factions.forEach((f, index) => {
             const finalValue = originalState.factions[index].relationship + (totalChanges.factions[f.id] || 0) * proportion;
             f.relationship = Math.max(-100, Math.min(100, finalValue));
@@ -1022,6 +1058,7 @@ const game = {
         this.state.playerNation.income = this.state.playerNation.income || { treasury: 10, manpower: 5, resources: 1 };
         this.state.playerNation.fatigue = 0;
         this.state.world.isEmergency = false;
+        this.state.research = this.state.research || { currentProject: null, progress: 0, timeElapsed: 0 };
 
 
 
@@ -1084,12 +1121,21 @@ const game = {
 
         await this.updateTendencies(playerChoice.text);
         
-        // Execute the logic associated with the player's choice
-        const choiceLogic = Choices[playerChoice.id] || playerChoice;
-        if (choiceLogic && typeof choiceLogic.execute === 'function') {
-            await choiceLogic.execute(this.state, choiceLogic);
+        // NEW: Check for triggered events
+        const triggeredEvent = this.checkTriggeredEvents();
+        if (triggeredEvent) {
+            // A special event overrides the player's choice!
+            Events[triggeredEvent.id] = triggeredEvent;
+            this.state.world.currentEvent = triggeredEvent.id;
+            openReportModal("긴급 상황!", `당신의 행동과 관계없이 긴급한 상황이 발생했습니다: ${triggeredEvent.narrative}`);
         } else {
-            console.error(`Choice logic for '${playerChoice.id}' not found or not executable.`);
+            // No triggered event, proceed as normal
+            const choiceLogic = Choices[playerChoice.id] || playerChoice;
+            if (choiceLogic && typeof choiceLogic.execute === 'function') {
+                await choiceLogic.execute(this.state, choiceLogic);
+            } else {
+                console.error(`Choice logic for '${playerChoice.id}' not found or not executable.`);
+            }
         }
         
         this.checkNationalSpiritFormation();
@@ -1132,6 +1178,34 @@ const game = {
         return [];
     },
     
+    checkTriggeredEvents() {
+        // Faction Rebellion Check
+        for (const faction of this.state.internalFactions) {
+            if (faction.loyalty < 20) {
+                // Trigger a rebellion!
+                faction.loyalty = 50; // Reset loyalty
+                this.applyEffects([
+                    {"type": "RESOURCE", "resource": "stability", "change": -20},
+                    {"type": "RESOURCE", "resource": "manpower", "change": -50000} // Example penalty
+                ]);
+                
+                const newEvent = {
+                    id: 'event_rebellion_' + faction.id,
+                    narrative: `[${faction.name}] 세력이 당신의 통치에 반발하여 반란을 일으켰습니다! 이들의 불만을 무시한 대가로 국가 안정도가 크게 하락하고 병력을 잃습니다.`,
+                    prompt: "반란을 어떻게 진압하시겠습니까?",
+                    choices: [
+                        { id: `rebel_1_${faction.id}`, text: "군대를 보내 무력으로 진압한다.", description: "질서를 회복하지만, 더 큰 불씨를 남길 수 있습니다.", execute: this.handleStandardChoice.bind(this) },
+                        { id: `rebel_2_${faction.id}`, text: "협상단을 보내 요구를 들어준다.", description: "국고를 소모하여 반란을 무마합니다.", execute: this.handleStandardChoice.bind(this) }
+                    ],
+                    baseChoices: []
+                };
+                newEvent.baseChoices = [...newEvent.choices];
+                return newEvent;
+            }
+        }
+        return null; // No event triggered
+    },
+
     /**
      * Checks if any new National Spirits should be formed based on player tendencies.
      */
@@ -1158,7 +1232,7 @@ const game = {
     /**
      * Handles a standard player choice by generating the next game event via the Gemini API.
      * @param {object} currentState - The current game state.
-     * @param {object} playerChoice - The choice object selected by the player.
+     *@param {object} playerChoice - The choice object selected by the player.
      */
     async handleStandardChoice(currentState, playerChoice) {
         const systemPrompt = `You are a game master for 'The Sovereign's Chronicle'. Your role is to create a challenging and realistic experience based on these core mechanics:
@@ -1169,7 +1243,7 @@ const game = {
 5.  **(If active) Fatigue System:** The leader's fatigue impacts their effectiveness. High fatigue might lead to poor outcomes or dialogue reflecting their exhaustion.
 
 Generate the next event IN KOREAN based on the player's choice. Follow these rules strictly:
--   **Reflect Game State:** The narrative MUST reflect the current state (factions, stability, leader's fatigue, etc.).
+-   **Reflect Game State:** The narrative MUST reflect the current state (factions, stability, leader's fatigue, research status, etc.).
 -   **Create Dilemmas:** Create choices that present a clear dilemma (e.g., spend money now on troops vs. save for a long-term project).
 -   **Strict Response Format:** Respond with ONLY the following sections, separated by '---':
     NARRATIVE: [A compelling story of what happens next.]
@@ -1182,7 +1256,7 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
     ---
     CHOICE 3: [Text for a third new choice (optional).]
     ---
-    EFFECTS: [A valid JSON array of game state changes. For effects of type "NEW_LEADER_TRAIT", the trait's 'effects' object MUST ONLY use keys from this list: [stability, approval, politicalPower, treasury, manpower, resources, techLevel, powerInfluence]. Examples: {"type": "INTERNAL_FACTION_LOYALTY", "factionId": "nobility", "change": -5}, {"type": "RESOURCE", "resource": "treasury", "change": -500}, {"type": "NEW_LEADER_TRAIT", "trait": {"id": "frugal", "name": "검소함", "description": "...", "effects": {"treasury_bonus": 5}}}]`;
+    EFFECTS: [A valid JSON array of game state changes. For effects of type "NEW_LEADER_TRAIT", the trait's 'effects' object MUST ONLY use keys from this list: [stability, approval, politicalPower, treasury, manpower, resources, techLevel, powerInfluence]. For "START_RESEARCH", provide a 'project' object with 'id', 'name', 'description', 'totalTime' (in hours), 'cost', and 'effects' (applied on completion). Examples: {"type": "INTERNAL_FACTION_LOYALTY", "factionId": "nobility", "change": -5}, {"type": "RESOURCE", "resource": "treasury", "change": -500}, {"type": "START_RESEARCH", "project": {"id": "cannon_research", "name": "대포 연구", "description": "...", "totalTime": 720, "cost": 150, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}}]`;
         
         const factionInfo = (currentState.factions || []).map(f => `${f.name}(${f.status}, 관계 ${f.relationship})`).join(', ');
         const internalFactionInfo = (currentState.internalFactions || []).map(f => `${f.name}(충성도 ${f.loyalty})`).join(', ');
@@ -1191,10 +1265,16 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
         if (useFatigueSystem && currentState.playerNation.fatigue > 50) {
             fatigueContext = `- Leader's Fatigue: ${currentState.playerNation.fatigue.toFixed(0)}% (High - This should affect the narrative, showing signs of exhaustion or poor judgment).\n`;
         }
+        
+        let researchContext = '현재 진행중인 연구 없음.';
+        if (currentState.research && currentState.research.currentProject) {
+            researchContext = `현재 [${currentState.research.currentProject.name}] 연구 진행 중 (${currentState.research.progress.toFixed(0)}% 완료).`;
+        }
 
         const userPrompt = `CURRENT STATE for ${currentState.playerNation.name} in ${new Date(currentState.world.date).getFullYear()}:\n` +
             `- Stability: ${currentState.playerNation.stability}, Treasury: ${currentState.playerNation.treasury}\n`+
             fatigueContext +
+            `- Current Research: ${researchContext}\n` +
             `- Foreign Factions: ${factionInfo}\n` +
             `- Internal Factions: ${internalFactionInfo}\n` +
             `PLAYER'S CHOICE: "${playerChoice.text}"\n` +
@@ -1278,8 +1358,18 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
     applyEffects(effects) {
         if (!Array.isArray(effects)) return;
 
+        const influence = (this.state.playerNation.powerInfluence || 100) / 100;
+
         effects.forEach(effect => {
             try {
+                // Apply power influence modifier
+                if (effect.change && (effect.type === 'RESOURCE' || effect.type === 'INTERNAL_FACTION_LOYALTY')) {
+                    if (effect.change > 0) { // Buffs are modified
+                        effect.change = Math.floor(effect.change * influence);
+                    }
+                    // Penalties are not modified (they always hit full force)
+                }
+
                 switch(effect.type) {
                     case 'INTERNAL_FACTION_LOYALTY':
                         const faction = this.state.internalFactions.find(f => f.id === effect.factionId);
@@ -1290,6 +1380,16 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
                     case 'RESOURCE':
                         if (this.state.playerNation.hasOwnProperty(effect.resource)) {
                             this.state.playerNation[effect.resource] += effect.change;
+                        }
+                        break;
+                    case 'START_RESEARCH':
+                        if (this.state.research.currentProject) {
+                            openReportModal("연구 지연", `[${this.state.research.currentProject.name}] 연구가 이미 진행 중입니다. 새로운 연구를 시작할 수 없습니다.`);
+                        } else {
+                            this.state.research.currentProject = effect.project;
+                            this.state.research.progress = 0;
+                            this.state.research.timeElapsed = 0;
+                            openReportModal("연구 시작", `[${effect.project.name}] 연구를 시작합니다. (예상 시간: ${effect.project.totalTime}시간)`);
                         }
                         break;
                     case 'NEW_LEADER_TRAIT':
@@ -1598,7 +1698,16 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
         },
         
         getResearchPanelHtml(researchState) {
-            if (!researchState || !researchState.currentProject) return '';
+            if (!researchState) return '<p class="text-center text-gray-500">연구 정보 없음.</p>';
+            
+            if (!researchState.currentProject) {
+                return `<div class="text-center">
+                            <p class="text-gray-500">현재 진행 중인 연구가 없습니다.</p>
+                            <button onclick="getResearchRecommendation()" class="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-md transition-all">
+                                ⚡ 연구 제안 받기
+                            </button>
+                        </div>`;
+            }
 
             const progress = researchState.progress || 0;
             const projectName = researchState.currentProject.name;
@@ -1675,8 +1784,12 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
 
         renderCollapsiblePanel(containerId, title, data, renderer) {
             const container = document.getElementById(containerId);
-            if (!data || (Array.isArray(data) && data.length === 0)) {
-                if(containerId !== 'time-panel-container' && containerId !== 'research-panel-container') {
+            
+            if (containerId === 'research-panel-container') {
+                // 연구 패널은 항상 표시, data는 game.state.research 객체임
+            } else if (!data || (Array.isArray(data) && data.length === 0)) {
+                // 시간 패널 외의 빈 배열 데이터는 렌더링 안 함
+                if(containerId !== 'time-panel-container') {
                      container.innerHTML = ''; return;
                 }
             }
@@ -1690,7 +1803,7 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
              };
             const iconHtml = icons[title] || '';
 
-            if (containerId === 'time-panel-container') {
+            if (containerId === 'time-panel-container' || containerId === 'research-panel-container') {
                  container.innerHTML = `
                     <div class="border border-gray-700 rounded-lg">
                         <div class="bg-gray-700 p-2 flex items-center gap-2 text-yellow-400">
@@ -1813,7 +1926,35 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
             listEl.innerHTML = '';
             if(!event || !event.choices) return;
             
-            const allChoices = [...event.choices]; // Removed intelligence report from here
+            let allChoices = [...event.choices];
+
+            // Add fatigue-based choice modification
+            if (useFatigueSystem && game.state.playerNation.fatigue > 75) {
+                // Disable complex choices
+                allChoices = allChoices.map(c => {
+                    const cText = c.text.toLowerCase();
+                    if (cText.includes('외교') || cText.includes('전략') || cText.includes('연구') || cText.includes('계획')) {
+                        return { ...c, disabled: true, description: "너무 피로하여 이 선택을 할 수 없습니다." };
+                    }
+                    return c;
+                });
+                
+                const restButton = document.createElement('button');
+                restButton.className = "w-full text-left p-4 rounded-lg choice-button bg-blue-700 border-blue-500";
+                restButton.innerHTML = `<p class="font-bold text-lg">[휴식] 너무 피로하다. 휴식을 취한다.</p><p class="text-sm text-gray-400">다음 날 아침까지 휴식하여 피로를 회복합니다.</p>`;
+                restButton.onclick = () => {
+                    const now = new Date(game.state.world.date);
+                    const tomorrow = new Date(now);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    tomorrow.setHours(9, 0, 0, 0);
+                    const restDuration = (tomorrow - now) / 1000;
+                    
+                    advanceTimeAndAnimate({ seconds: restDuration, isResting: true }, () => {
+                        game.Renderer.renderAll();
+                    });
+                };
+                listEl.appendChild(restButton);
+            }
 
             allChoices.forEach(choice => {
                 if (!choice) return;
@@ -1825,6 +1966,12 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
                 }
                 button.innerHTML = `<p class="font-bold text-lg">${buttonText}</p><p class="text-sm text-gray-400">${choice.description}</p>`;
                 button.onclick = () => game.update(choice);
+                
+                button.disabled = choice.disabled;
+                if (choice.disabled) {
+                    button.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+
                 listEl.appendChild(button);
             });
         }
@@ -1909,6 +2056,76 @@ function openActionConfirmModal(choice) {
 function closeActionConfirmModal() {
     pendingChoice = null;
     document.getElementById('action-confirm-modal').classList.add('hidden');
+}
+
+async function getResearchRecommendation() {
+    document.getElementById('gemini-loading-overlay').classList.remove('hidden');
+    const systemPrompt = `You are a science advisor. Based on the current state, suggest ONE new research project. Respond with ONLY a valid JSON object: {"id": "...", "name": "...", "description": "...", "totalTime": 100, "cost": 50, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}.
+    - totalTime is in hours (e.g., 100).
+    - cost is for the treasury (e.g., 50).
+    - effects are applied on completion.`;
+    
+    const userPrompt = `Current State: Tech Level ${game.state.playerNation.techLevel}, Treasury: ${game.state.playerNation.treasury}. Suggest one new research project as JSON.`;
+
+    try {
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) throw new Error("AI did not suggest research.");
+
+        // FIX: Clean the response text before parsing
+        let cleanedText = responseText.trim();
+        if (cleanedText.startsWith("```json")) {
+            cleanedText = cleanedText.substring(7); // Remove "```json"
+        }
+        if (cleanedText.startsWith("```")) {
+            cleanedText = cleanedText.substring(3); // Remove "```"
+        }
+        if (cleanedText.endsWith("```")) {
+            cleanedText = cleanedText.substring(0, cleanedText.length - 3); // Remove "```"
+        }
+        cleanedText = cleanedText.trim(); // Trim any whitespace
+
+        const project = JSON.parse(cleanedText);
+        
+        // Create a new choice based on the project
+        const choiceId = `research_prop_${project.id}_${Date.now()}`;
+        const newChoice = {
+            id: choiceId,
+            text: `[연구 제안] ${project.name} (비용: ${project.cost})`,
+            description: `${project.description} (예상 시간: ${project.totalTime}시간)`,
+            execute: (state, choice) => {
+                // 1. Check cost
+                if (state.playerNation.treasury < project.cost) {
+                    openReportModal("자금 부족", "연구를 시작하기에 국고가 부족합니다.");
+                    return; // Stop execution
+                }
+                // 2. Apply cost and start research
+                game.applyEffects([
+                    {"type": "RESOURCE", "resource": "treasury", "change": -project.cost},
+                    {"type": "START_RESEARCH", "project": project}
+                ]);
+                // 3. Proceed to the next event (as if a standard choice was made)
+                game.handleStandardChoice(state, choice);
+            }
+        };
+        
+        if (!Choices[choiceId]) {
+            Choices[choiceId] = newChoice;
+        }
+
+        const currentEvent = Events[game.state.world.currentEvent];
+        if (!currentEvent.choices.some(c => c.text.includes(project.name))) {
+            currentEvent.choices.push(newChoice);
+        }
+        
+        game.Renderer.renderChoices();
+        showInfoModal("연구 제안", `[${project.name}] 연구가 선택지에 추가되었습니다.`);
+
+    } catch (e) {
+        console.error("Failed to get research recommendation:", e);
+        showInfoModal("제안 실패", "AI가 연구를 제안하는 데 실패했습니다. 응답 형식이 잘못되었을 수 있습니다.");
+    } finally {
+        document.getElementById('gemini-loading-overlay').classList.add('hidden');
+    }
 }
 
 async function handleAbsurdAction() {
@@ -2398,6 +2615,76 @@ function performIntelligenceAction(actionId) {
         showInfoModal("첩보 활동", `[${action.name}] 활동을 위해 권력 ${action.cost}을(를) 사용했습니다.`);
     } else {
         showInfoModal("권력 부족", "첩보 활동을 실행하기에 권력이 부족합니다.");
+    }
+}
+
+async function getResearchRecommendation() {
+    document.getElementById('gemini-loading-overlay').classList.remove('hidden');
+    const systemPrompt = `You are a science advisor. Based on the current state, suggest ONE new research project. Respond with ONLY a valid JSON object: {"id": "...", "name": "...", "description": "...", "totalTime": 100, "cost": 50, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}.
+    - totalTime is in hours (e.g., 100).
+    - cost is for the treasury (e.g., 50).
+    - effects are applied on completion.`;
+    
+    const userPrompt = `Current State: Tech Level ${game.state.playerNation.techLevel}, Treasury: ${game.state.playerNation.treasury}. Suggest one new research project as JSON.`;
+
+    try {
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) throw new Error("AI did not suggest research.");
+
+        // FIX: Clean the response text before parsing
+        let cleanedText = responseText.trim();
+        if (cleanedText.startsWith("```json")) {
+            cleanedText = cleanedText.substring(7); // Remove "```json"
+        }
+        if (cleanedText.startsWith("```")) {
+            cleanedText = cleanedText.substring(3); // Remove "```"
+        }
+        if (cleanedText.endsWith("```")) {
+            cleanedText = cleanedText.substring(0, cleanedText.length - 3); // Remove "```"
+        }
+        cleanedText = cleanedText.trim(); // Trim any whitespace
+
+        const project = JSON.parse(cleanedText);
+        
+        // Create a new choice based on the project
+        const choiceId = `research_prop_${project.id}_${Date.now()}`;
+        const newChoice = {
+            id: choiceId,
+            text: `[연구 제안] ${project.name} (비용: ${project.cost})`,
+            description: `${project.description} (예상 시간: ${project.totalTime}시간)`,
+            execute: (state, choice) => {
+                // 1. Check cost
+                if (state.playerNation.treasury < project.cost) {
+                    openReportModal("자금 부족", "연구를 시작하기에 국고가 부족합니다.");
+                    return; // Stop execution
+                }
+                // 2. Apply cost and start research
+                game.applyEffects([
+                    {"type": "RESOURCE", "resource": "treasury", "change": -project.cost},
+                    {"type": "START_RESEARCH", "project": project}
+                ]);
+                // 3. Proceed to the next event (as if a standard choice was made)
+                game.handleStandardChoice(state, choice);
+            }
+        };
+        
+        if (!Choices[choiceId]) {
+            Choices[choiceId] = newChoice;
+        }
+
+        const currentEvent = Events[game.state.world.currentEvent];
+        if (!currentEvent.choices.some(c => c.text.includes(project.name))) {
+            currentEvent.choices.push(newChoice);
+        }
+        
+        game.Renderer.renderChoices();
+        showInfoModal("연구 제안", `[${project.name}] 연구가 선택지에 추가되었습니다.`);
+
+    } catch (e) {
+        console.error("Failed to get research recommendation:", e);
+        showInfoModal("제안 실패", "AI가 연구를 제안하는 데 실패했습니다. 응답 형식이 잘못되었을 수 있습니다.");
+    } finally {
+        document.getElementById('gemini-loading-overlay').classList.add('hidden');
     }
 }
 
