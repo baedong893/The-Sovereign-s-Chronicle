@@ -336,6 +336,26 @@
         </div>
     </div>
 
+    <!-- [새로 추가된] 연구 제안 모달 -->
+    <div id="research-proposal-modal" class="overlay hidden justify-center items-center">
+        <div class="modal-content w-full max-w-2xl">
+             <h3 class="text-xl font-bold mb-4 text-yellow-300">연구 제안 목록</h3>
+             <p class="text-gray-400 mb-4">자문회나 AI가 제안한 연구 과제입니다. 하나를 선택해 연구를 시작할 수 있습니다.</p>
+             <div id="research-proposal-list" class="space-y-3 max-h-80 overflow-y-auto">
+                 <!-- 연구 제안이 여기에 렌더링됩니다. -->
+                 <p class="text-gray-500 text-center">현재 제안된 연구가 없습니다.</p>
+             </div>
+             <!-- [수정됨] 모달 푸터를 수정하여 AI 제안 버튼을 모달 안으로 이동 -->
+             <div class="mt-6 flex justify-between items-center gap-4">
+                 <button onclick="handleResearchButton()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-bold">
+                     ⚡ AI에게 새 제안 받기
+                 </button>
+                 <button onclick="closeResearchProposalModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md">닫기</button>
+             </div>
+        </div>
+    </div>
+    <!-- 연구 제안 모달 끝 -->
+
 
     <div id="container" class="rounded-lg overflow-hidden border">
         <header class="bg-gray-900 p-4 border-b border-gray-700 flex justify-between items-center gap-4">
@@ -1037,6 +1057,7 @@ const game = {
     state: {},
     selectedAdvisors: new Set(),
     newProposals: [],
+    availableResearch: [], // [새로 추가됨] 연구 제안 저장용 배열
     isRegenerating: false,
     advisorConversationTextHistory: "",
     
@@ -1517,10 +1538,16 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
             let generalModifierLines = [];
             if (allGeneralModifiers.length > 0) {
                 allGeneralModifiers.forEach(mod => {
-                    generalModifierValue += mod.value;
-                    const color = mod.value >= 0 ? 'text-green-400' : 'text-red-400';
-                    const sign = mod.value >= 0 ? '+' : '';
-                    generalModifierLines.push(`<li><span class='${color}'>${mod.name}:</span> <span class='float-right ${color}'>${sign}${mod.value.toLocaleString()}${unit}</span></li>`);
+                    // [FIX] Check if mod.value is a valid number before using it
+                    if (typeof mod.value === 'number' && !isNaN(mod.value)) {
+                        generalModifierValue += mod.value;
+                        const color = mod.value >= 0 ? 'text-green-400' : 'text-red-400';
+                        const sign = mod.value >= 0 ? '+' : '';
+                        generalModifierLines.push(`<li><span class='${color}'>${mod.name}:</span> <span class='float-right ${color}'>${sign}${mod.value.toLocaleString()}${unit}</span></li>`);
+                    } else {
+                        // Log an error if the modifier data is bad, but don't crash
+                        console.warn("Skipping bad modifier in createStatTooltip:", mod);
+                    }
                 });
             }
 
@@ -1533,7 +1560,8 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
                         const effectKey = Object.keys(trait.effects).find(k => k.startsWith(statKey));
                         if (effectKey) {
                             const value = trait.effects[effectKey];
-                            if (typeof value === 'number') {
+                            // [FIX] Add check for value
+                            if (typeof value === 'number' && !isNaN(value)) {
                                 traitModifierValue += value;
                                 const color = value >= 0 ? 'text-green-400' : 'text-red-400';
                                 const sign = value >= 0 ? '+' : '';
@@ -1553,10 +1581,13 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
                         const effectKey = Object.keys(policy.effects).find(k => k.startsWith(statKey) && (k.endsWith('_bonus') || k.endsWith('_penalty')));
                         if (effectKey) {
                             const value = policy.effects[effectKey];
-                            policyModifierValue += value;
-                            const color = value >= 0 ? 'text-green-400' : 'text-red-400';
-                            const sign = value >= 0 ? '+' : '';
-                            policyModifierLines.push(`<li><span class='${color}'>${policy.name}:</span> <span class='float-right ${color}'>${sign}${value.toLocaleString()}${unit}</span></li>`);
+                            // [FIX] Add check for value
+                            if (typeof value === 'number' && !isNaN(value)) {
+                                policyModifierValue += value;
+                                const color = value >= 0 ? 'text-green-400' : 'text-red-400';
+                                const sign = value >= 0 ? '+' : '';
+                                policyModifierLines.push(`<li><span class='${color}'>${policy.name}:</span> <span class='float-right ${color}'>${sign}${value.toLocaleString()}${unit}</span></li>`);
+                            }
                         }
                     }
                 });
@@ -1700,32 +1731,42 @@ Generate the next event IN KOREAN based on the player's choice. Follow these rul
         getResearchPanelHtml(researchState) {
             if (!researchState) return '<p class="text-center text-gray-500">연구 정보 없음.</p>';
             
+            let html = '<div class="space-y-4">'; // Use a container for spacing
+
             if (!researchState.currentProject) {
-                return `<div class="text-center">
-                            <p class="text-gray-500">현재 진행 중인 연구가 없습니다.</p>
-                            <button onclick="getResearchRecommendation()" class="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-md transition-all">
-                                ⚡ 연구 제안 받기
-                            </button>
-                        </div>`;
+                html += `<p class="text-center text-gray-500">현재 진행 중인 연구가 없습니다.</p>`;
+            } else {
+                const progress = researchState.progress || 0;
+                const projectName = researchState.currentProject.name;
+                const gradientColor = `linear-gradient(to right, #60a5fa, #3b82f6, #1d4ed8)`;
+
+                html += `
+                     <div class="font-mono text-sm">
+                        <div class="flex justify-between items-center mb-2">
+                             <div>
+                                <span class="font-bold">연구: <span class="text-blue-300">${projectName}</span></span>
+                                <span class="ml-4 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">진행중</span>
+                            </div>
+                            <span class="font-mono text-gray-300">${progress.toFixed(0)}%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5">
+                            <!-- [수정] style에서 "transition: width 0.5s ease-in-out;" 속성을 제거하여 JS 애니메이션과 충돌하지 않도록 함 -->
+                            <div class="bg-blue-500 h-2.5 rounded-full" style="width: ${progress}%; background: ${gradientColor};"></div>
+                        </div>
+                    </div>`;
             }
 
-            const progress = researchState.progress || 0;
-            const projectName = researchState.currentProject.name;
-            const gradientColor = `linear-gradient(to right, #60a5fa, #3b82f6, #1d4ed8)`;
-
-            return `
-                 <div class="font-mono text-sm">
-                    <div class="flex justify-between items-center mb-2">
-                         <div>
-                            <span class="font-bold">연구: <span class="text-blue-300">${projectName}</span></span>
-                            <span class="ml-4 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full">진행중</span>
-                        </div>
-                        <span class="font-mono text-gray-300">${progress.toFixed(0)}%</span>
-                    </div>
-                    <div class="w-full bg-gray-700 rounded-full h-2.5">
-                        <div class="bg-blue-500 h-2.5 rounded-full" style="width: ${progress}%; background: ${gradientColor}; transition: width 0.5s ease-in-out;"></div>
-                    </div>
+            // Part 2: Always show the button
+            html += `
+                <div class="text-center">
+                    <!-- [수정됨] 버튼 이름 변경 및 onclick 함수를 모달 열기로 변경 -->
+                    <button onclick="openResearchProposalModal()" class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-md transition-all">
+                        📜 연구 제안
+                    </button>
                 </div>`;
+            
+            html += '</div>'; // Close container
+            return html;
         },
 
         getTimePanelHtml(state) {
@@ -2510,11 +2551,23 @@ async function getGroupAdvice(isFollowUp = false, userInput = "") {
                 }
 
                 if (proposalTextForChoice) {
-                     if (!game.newProposals.some(p => p.text === proposalTextForChoice)) {
-                        game.newProposals.push({ advisorName: speakerForProposal, text: proposalTextForChoice });
+                    // [수정됨] 과학 고문의 제안인지 확인
+                    const advisor = selectedAdvisors.find(a => a.name === speakerForProposal);
+                    
+                    if (advisor && advisor.role === 'science') {
+                        // 과학 고문의 제안 -> 연구 목록으로
+                        convertTextToResearchProject(proposalTextForChoice, speakerForProposal); // 비동기 실행 (결과는 availableResearch에 추가됨)
+                        const styledProposal = `<span class="text-cyan-400 font-bold" title="이 제안이 연구 목록에 추가되었습니다.">[연구 제안] ${proposalTextForChoice}</span>`;
+                        dialogue = dialogue.replace(new RegExp(proposalTextForChoice.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i'), styledProposal);
+
+                    } else {
+                        // 다른 고문의 제안 -> 일반 선택지로
+                         if (!game.newProposals.some(p => p.text === proposalTextForChoice)) {
+                            game.newProposals.push({ advisorName: speakerForProposal, text: proposalTextForChoice });
+                        }
+                        const styledProposal = `<span class="text-yellow-300 font-bold underline decoration-wavy" title="이 제안이 선택지에 추가되었습니다.">${proposalTextForChoice}</span>`;
+                        dialogue = dialogue.replace(new RegExp(proposalTextForChoice.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i'), styledProposal);
                     }
-                    const styledProposal = `<span class="text-yellow-300 font-bold underline decoration-wavy" title="이 제안이 선택지에 추가되었습니다.">${proposalTextForChoice}</span>`;
-                    dialogue = dialogue.replace(new RegExp(proposalTextForChoice.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i'), styledProposal);
                 }
             }
             
@@ -2618,75 +2671,228 @@ function performIntelligenceAction(actionId) {
     }
 }
 
-async function getResearchRecommendation() {
+// [삭제됨] 기존 getResearchRecommendation() 함수 (1974-2035행)는 삭제하고
+// 아래의 새로운 함수들로 대체합니다.
+
+// --- [새로운 함수들 시작] ---
+
+// 연구 제안 모달 닫기
+function closeResearchProposalModal() {
+    document.getElementById('research-proposal-modal').classList.add('hidden');
+}
+
+// 연구 제안 모달 열기 (및 목록 새로고침)
+function openResearchProposalModal() {
+    renderResearchProposals();
+    document.getElementById('research-proposal-modal').classList.remove('hidden');
+}
+
+// [⚡ 연구 제안 받기] 버튼 클릭 시 실행되는 함수
+async function handleResearchButton() {
     document.getElementById('gemini-loading-overlay').classList.remove('hidden');
-    const systemPrompt = `You are a science advisor. Based on the current state, suggest ONE new research project. Respond with ONLY a valid JSON object: {"id": "...", "name": "...", "description": "...", "totalTime": 100, "cost": 50, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}.
-    - totalTime is in hours (e.g., 100).
-    - cost is for the treasury (e.g., 50).
-    - effects are applied on completion.`;
+    try {
+        const project = await callAiForResearchProposal();
+        if (project) {
+            // 중복 제안 방지
+            if (!game.availableResearch.some(p => p.id === project.id || p.name === project.name)) {
+                game.availableResearch.push(project);
+            }
+            openResearchProposalModal(); // AI 제안 후 모달 열기
+        } else {
+            showInfoModal("제안 실패", "AI가 연구를 제안하는 데 실패했습니다.");
+        }
+    } catch (e) {
+        console.error("Failed to handle research button click:", e);
+        showInfoModal("오류", "연구 제안을 처리하는 중 오류가 발생했습니다.");
+    } finally {
+        document.getElementById('gemini-loading-overlay').classList.add('hidden');
+    }
+}
+
+// AI를 호출하여 연구 프로젝트 JSON 1개를 받아오는 함수
+async function callAiForResearchProposal() {
+    const systemPrompt = `You are a science advisor. Based on the current state, suggest ONE new research project.
+    **RULES:**
+    1.  Respond with ONLY a valid JSON object: {"id": "...", "name": "...", "description": "...", "totalTime": 100, "cost": 50, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}.
+    2.  The 'name' and 'description' fields MUST be in KOREAN.
+    3.  The project MUST be historically and technologically appropriate for the current era (e.g., "Roman Concrete" for BC 44, not "AI Algorithms").
+    4.  totalTime is in hours (e.g., 100).
+    5.  cost is for the treasury (e.g., 50).
+    6.  effects are applied on completion.
+    7.  Make sure the ID is unique, e.g., using 'ai_proj_12345'.`;
     
-    const userPrompt = `Current State: Tech Level ${game.state.playerNation.techLevel}, Treasury: ${game.state.playerNation.treasury}. Suggest one new research project as JSON.`;
+    const userPrompt = `Current State: 
+    - Era: ${new Date(game.state.world.date).toUTCString()} (This is ${formatHistoricalDate(game.state.world.date)})
+    - Tech Level: ${game.state.playerNation.techLevel}
+    - Treasury: ${game.state.playerNation.treasury}
+    Suggest one new KOREAN, era-appropriate research project as JSON.`;
 
     try {
         const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
         if (!responseText) throw new Error("AI did not suggest research.");
 
-        // FIX: Clean the response text before parsing
         let cleanedText = responseText.trim();
-        if (cleanedText.startsWith("```json")) {
-            cleanedText = cleanedText.substring(7); // Remove "```json"
-        }
-        if (cleanedText.startsWith("```")) {
-            cleanedText = cleanedText.substring(3); // Remove "```"
-        }
-        if (cleanedText.endsWith("```")) {
-            cleanedText = cleanedText.substring(0, cleanedText.length - 3); // Remove "```"
-        }
-        cleanedText = cleanedText.trim(); // Trim any whitespace
+        if (cleanedText.startsWith("```json")) cleanedText = cleanedText.substring(7);
+        if (cleanedText.startsWith("```")) cleanedText = cleanedText.substring(3);
+        if (cleanedText.endsWith("```")) cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+        cleanedText = cleanedText.trim();
 
         const project = JSON.parse(cleanedText);
-        
-        // Create a new choice based on the project
-        const choiceId = `research_prop_${project.id}_${Date.now()}`;
-        const newChoice = {
-            id: choiceId,
-            text: `[연구 제안] ${project.name} (비용: ${project.cost})`,
-            description: `${project.description} (예상 시간: ${project.totalTime}시간)`,
-            execute: (state, choice) => {
-                // 1. Check cost
-                if (state.playerNation.treasury < project.cost) {
-                    openReportModal("자금 부족", "연구를 시작하기에 국고가 부족합니다.");
-                    return; // Stop execution
-                }
-                // 2. Apply cost and start research
-                game.applyEffects([
-                    {"type": "RESOURCE", "resource": "treasury", "change": -project.cost},
-                    {"type": "START_RESEARCH", "project": project}
-                ]);
-                // 3. Proceed to the next event (as if a standard choice was made)
-                game.handleStandardChoice(state, choice);
-            }
-        };
-        
-        if (!Choices[choiceId]) {
-            Choices[choiceId] = newChoice;
-        }
-
-        const currentEvent = Events[game.state.world.currentEvent];
-        if (!currentEvent.choices.some(c => c.text.includes(project.name))) {
-            currentEvent.choices.push(newChoice);
-        }
-        
-        game.Renderer.renderChoices();
-        showInfoModal("연구 제안", `[${project.name}] 연구가 선택지에 추가되었습니다.`);
+        // AI가 생성한 프로젝트에 'source' 필드 추가
+        project.source = "AI 제안"; 
+        return project;
 
     } catch (e) {
-        console.error("Failed to get research recommendation:", e);
-        showInfoModal("제안 실패", "AI가 연구를 제안하는 데 실패했습니다. 응답 형식이 잘못되었을 수 있습니다.");
-    } finally {
-        document.getElementById('gemini-loading-overlay').classList.add('hidden');
+        console.error("Failed to get AI research proposal:", e, "Response text:", responseText);
+        return null;
     }
 }
+
+// 자문회 고문의 '텍스트 제안'을 AI를 이용해 '프로젝트 JSON'으로 변환하는 함수
+async function convertTextToResearchProject(proposalText, advisorName) {
+    showInfoModal("연구 분석 중", `[${advisorName}]의 제안을 분석하여 연구 과제로 등록 중입니다...`);
+    
+    const systemPrompt = `You are a game system parser. Convert the advisor's text proposal into a valid JSON research project object.
+    **RULES:**
+    1.  Respond with ONLY the valid JSON.
+    2.  Format: {"id": "...", "name": "...", "description": "...", "totalTime": 100, "cost": 50, "effects": [{"type": "RESOURCE", "resource": "techLevel", "change": 1}]}.
+    3.  The 'name' and 'description' fields MUST be in KOREAN.
+    4.  The project MUST be historically and technologically appropriate for the current era.
+    5.  Base the 'name' and 'description' on the proposal text.
+    6.  Estimate 'totalTime' (hours) and 'cost' (treasury) based on the proposal's scale.
+    7.  Create a logical 'effects' array.
+    8.  Make the ID unique, e.g., 'adv_proj_12345'.`;
+        
+    const userPrompt = `Advisor Proposal Text: "${proposalText}"
+    Current State:
+    - Era: ${new Date(game.state.world.date).toUTCString()} (This is ${formatHistoricalDate(game.state.world.date)})
+    - Tech Level: ${game.state.playerNation.techLevel}
+    - Treasury: ${game.state.playerNation.treasury}
+    Convert this text to KOREAN, era-appropriate JSON.`;
+
+    try {
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        if (!responseText) throw new Error("AI did not parse research.");
+
+        let cleanedText = responseText.trim();
+        if (cleanedText.startsWith("```json")) cleanedText = cleanedText.substring(7);
+        if (cleanedText.startsWith("```")) cleanedText = cleanedText.substring(3);
+        if (cleanedText.endsWith("```")) cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+        cleanedText = cleanedText.trim();
+
+        const project = JSON.parse(cleanedText);
+        project.source = `${advisorName} 제안`; // 제안자 정보 추가
+        
+        // 중복 제안 방지
+        if (!game.availableResearch.some(p => p.id === project.id || p.name === project.name)) {
+            game.availableResearch.push(project);
+            showInfoModal("연구 제안 추가", `[${advisorName}]의 제안이 연구 목록에 추가되었습니다.`);
+        }
+    } catch (e) {
+        console.error("Failed to convert text to research project:", e, "Response text:", responseText);
+        showInfoModal("제안 분석 실패", `[${advisorName}]의 제안을 분석하는 데 실패했습니다.`);
+    }
+}
+
+// 연구 제안 모달의 목록을 렌더링하는 함수
+function renderResearchProposals() {
+    const listEl = document.getElementById('research-proposal-list');
+    listEl.innerHTML = '';
+
+    if (game.availableResearch.length === 0) {
+        listEl.innerHTML = `<p class="text-gray-500 text-center">현재 제안된 연구가 없습니다.</p>`;
+        return;
+    }
+
+    game.availableResearch.forEach((project, index) => {
+        const canAfford = game.state.playerNation.treasury >= project.cost;
+        const currencyPrefix = getCurrencySymbol(game.state.world.date, game.state.playerNation.name);
+        
+        const item = document.createElement('div');
+        item.className = `bg-gray-800 p-4 rounded-lg border-l-4 transition ${canAfford ? 'border-blue-500 hover:bg-gray-700 cursor-pointer' : 'border-red-500 opacity-60'}`;
+        
+        // [수정됨] 마우스를 올리면 항상 세부 설명이 툴팁으로 표시되도록 수정
+        item.title = project.description || "세부 설명이 없습니다.";
+
+        item.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs text-cyan-400 font-mono">${project.source || '연구 제안'}</p>
+                    <h4 class="font-bold text-lg text-white">${project.name}</h4>
+                    <p class="text-sm text-gray-400 mt-1">${project.description}</p>
+                </div>
+                <div class="text-right ml-4 flex-shrink-0">
+                    <p class="font-bold text-lg ${canAfford ? 'text-yellow-400' : 'text-red-400'}">${currencyPrefix} ${project.cost}</p>
+                    <p class="text-sm text-gray-400">${project.totalTime} 시간</p>
+                </div>
+            </div>
+        `;
+        
+        if (canAfford) {
+            item.onclick = () => selectResearchProject(index);
+        } else {
+            // [수정됨] 세부 설명 뒤에 자금 부족 메시지 추가
+            item.title += "\n\n(국고가 부족하여 이 연구를 시작할 수 없습니다.)";
+        }
+        
+        listEl.appendChild(item);
+    });
+}
+
+// 연구 제안 모달에서 프로젝트를 선택했을 때 실행되는 함수
+function selectResearchProject(index) {
+    const project = game.availableResearch[index];
+    if (!project) return;
+    
+    if (game.state.research.currentProject) {
+        openReportModal("연구 진행 중", `[${game.state.research.currentProject.name}] 연구가 이미 진행 중입니다. 동시에 여러 연구를 진행할 수 없습니다.`);
+        return;
+    }
+
+    if (game.state.playerNation.treasury < project.cost) {
+        openReportModal("자금 부족", "연구를 시작하기에 국고가 부족합니다.");
+        return;
+    }
+    
+    // 1. 목록에서 제거
+    game.availableResearch.splice(index, 1);
+    
+    // 2. 비용 적용 및 연구 시작
+    game.applyEffects([
+        {"type": "RESOURCE", "resource": "treasury", "change": -project.cost},
+        {"type": "START_RESEARCH", "project": project}
+    ]);
+    
+    // 3. 모달 닫기 및 UI 새로고침
+    closeResearchProposalModal();
+    game.Renderer.renderAll(); // UI 패널(국고) 및 연구 패널 새로고침
+    
+    // 4. [수정됨] 턴을 진행하지 않고 즉시 연구를 시작합니다.
+    // 다음 턴으로 넘어가지 않으므로, '새로운 역사 생성 중' 로딩이 표시되지 않습니다.
+    /*
+    const timeToAdvance = estimateTimeForAction("연구 시작");
+    advanceTimeAndAnimate(timeToAdvance, async () => {
+        // 연구 시작에 대한 간단한 결과 서술 생성
+        const systemPrompt = `You are a game master. The player just started a new research project. Write a very brief (1-2 sentences) narrative IN KOREAN describing this action. Respond with ONLY the narrative text.`;
+        const userPrompt = `Player started research: "${project.name}". Current date: ${new Date(game.state.world.date).getFullYear()}.`;
+        
+        const responseText = await GEMINI.callGeminiApi(systemPrompt, userPrompt);
+        const narrative = responseText || `[${project.name}]에 대한 연구가 공식적으로 시작되었습니다. 학자들이 연구소에 모여듭니다.`;
+
+        // 이 연구 시작 행동을 기반으로 다음 이벤트 생성
+        // (handleStandardChoice를 모방하여 다음 이벤트를 생성합니다)
+        await game.handleStandardChoice(game.state, {
+            id: 'choice_start_research_' + project.id,
+            text: `[${project.name}] 연구를 시작했다.` // 이 텍스트를 기반으로 AI가 다음 턴을 생성
+        });
+        
+        // ensure the narrative we generated is shown (handleStandardChoice will overwrite it, so we show it in a report)
+        // openReportModal("연구 시작", narrative); // This might be redundant with the one from applyEffects
+    });
+    */
+}
+
+// --- [새로운 함수들 끝] ---
 
 function toggleCollapsible(header) {
     const content = header.nextElementSibling;
@@ -2784,4 +2990,10 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
